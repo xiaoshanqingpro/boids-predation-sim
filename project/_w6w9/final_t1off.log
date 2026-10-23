@@ -1,0 +1,17 @@
+{"seed":1,"frames":4000,"warm":1500,"N":2000,"score0":476,"score1":226,"dScore0":301,"dScore1":68,"dKills0":127,"dKills1":96,"dKillsAll":290,"dashEnds":53,"dDashEnds":39,"dashEndsF0":27,"dashEndsF1":26,"dMissFalcon":13,"dashMaxEats":13,"dashMaxEatsLocked":13,"dashMaxEatsFree":0,"dashEats0":117,"dDashEats0":77,"chainGooseEnds":2,"dChainGooseEnds":1,"chainRelock":143,"chainTriggers":38,"chainMaxEats":13,"endEnergy":18,"endBudget":2,"endBill":24,"endGoose":2,"endInterrupt":0,"dGooseKills0":0,"lockedDashes":88,"noLockAborts":5,"mobInterrupts":16,"coneFalconFrames":0,"dashEndBirds":2729,"killsTotal":470,"hash":"29534a79","eatMeanPerDash":4.33,"evPerDash":9.05}
+{"seed":2,"frames":4000,"warm":1500,"N":2000,"score0":691,"score1":774,"dScore0":583,"dScore1":764,"dKills0":96,"dKills1":95,"dKillsAll":232,"dashEnds":52,"dDashEnds":33,"dashEndsF0":25,"dashEndsF1":27,"dMissFalcon":8,"dashMaxEats":8,"dashMaxEatsLocked":8,"dashMaxEatsFree":0,"dashEats0":85,"dDashEats0":67,"chainGooseEnds":3,"dChainGooseEnds":3,"chainRelock":151,"chainTriggers":32,"chainMaxEats":8,"endEnergy":18,"endBudget":1,"endBill":11,"endGoose":3,"endInterrupt":0,"dGooseKills0":0,"lockedDashes":63,"noLockAborts":0,"mobInterrupts":21,"coneFalconFrames":15,"dashEndBirds":2539,"killsTotal":333,"hash":"ec495895","eatMeanPerDash":3.4,"evPerDash":18.64}
+{"seed":3,"frames":4000,"warm":1500,"N":2000,"score0":609,"score1":478,"dScore0":488,"dScore1":456,"dKills0":92,"dKills1":84,"dKillsAll":242,"dashEnds":56,"dDashEnds":38,"dashEndsF0":27,"dashEndsF1":29,"dMissFalcon":6,"dashMaxEats":8,"dashMaxEatsLocked":8,"dashMaxEatsFree":1,"dashEats0":93,"dDashEats0":64,"chainGooseEnds":6,"dChainGooseEnds":5,"chainRelock":168,"chainTriggers":40,"chainMaxEats":8,"endEnergy":29,"endBudget":1,"endBill":7,"endGoose":6,"endInterrupt":1,"dGooseKills0":0,"lockedDashes":77,"noLockAborts":5,"mobInterrupts":15,"coneFalconFrames":19,"dashEndBirds":2513,"killsTotal":346,"hash":"5ed6a5a1","eatMeanPerDash":3.44,"evPerDash":13.47}
+{"seed":4,"frames":4000,"warm":1500,"N":2000,"score0":216,"score1":81,"dScore0":192,"dScore1":58,"dKills0":109,"dKills1":78,"dKillsAll":222,"dashEnds":50,"dDashEnds":36,"dashEndsF0":26,"dashEndsF1":24,"dMissFalcon":9,"dashMaxEats":8,"dashMaxEatsLocked":8,"dashMaxEatsFree":0,"dashEats0":88,"dDashEats0":67,"chainGooseEnds":0,"dChainGooseEnds":0,"chainRelock":162,"chainTriggers":36,"chainMaxEats":8,"endEnergy":32,"endBudget":2,"endBill":6,"endGoose":0,"endInterrupt":1,"dGooseKills0":0,"lockedDashes":64,"noLockAborts":0,"mobInterrupts":13,"coneFalconFrames":0,"dashEndBirds":2206,"killsTotal":316,"hash":"6b36a966","eatMeanPerDash":3.38,"evPerDash":6.33}
+--- 汇总(掠食竞赛(4).html warm=1500 frames=4000) ---
+dashMaxEats 全局: 13
+dashEnds 增量: 39,33,38,36  合计 146
+单次冲刺 eats 均值(隼①吃数/隼①冲刺数): 4.33,3.4,3.44,3.38
+隼①冲刺收尾数: 27,25,27,26  隼②: 26,27,29,24
+单链 eats 上界: 13,8,8,8  验收 dashMaxEats: 13,8,8,8
+链终止分布 能量: 18,18,29,32  预算: 2,1,1,2  账单: 24,11,7,6  大餐: 2,3,6,0  打断: 0,0,1,1
+Δscore0: 301,583,488,192  隼①净得分>0 的种子数: 4
+EV/次冲刺: 9.05,18.64,13.47,6.33
+chainGooseEnds: 2,3,6,0  增量: 1,3,5,0
+再锁定次数: 143,151,168,162  链触发: 38,32,40,36
+总捕获: 470,333,346,316
+物理哈希: 29534a79,ec495895,5ed6a5a1,6b36a966

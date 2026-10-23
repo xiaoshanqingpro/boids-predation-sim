@@ -1,0 +1,56 @@
+html=掠食竞赛(4).html  sha256=205bd9a324526ffed7950d2156d3ae466b45010cda955203cf1a17f8168629ed  warm=1500 frames=4000 seeds=1,2,3,4
+{"seed":1,"warm":1500,"frames":4000,"harrier":true,"nFalcon":2,"sha":"205bd9a324526ffe","dKills":183,"dashEnds":35,"dashEndBirds":1464,"dashEndsF0":18,"dashEndsF1":17,"eatsF0":28,"eatsF1":57,"chainTriggers":32,"dashMaxEats":7,"falconClashes":10,"falconSteals":0,"sharedPcUses":2179,"eventDoubles":25,"shepherdFrames":4432,"evtBiasDashes":22,"steals":0,"clashes":10,"spdMean":5.148,"spdVar":2.8454,"roleHunter":4000,"roleAmbush":3981,"roleShepherd":19,"lastRoles":["hunter","ambush"],"score0":9.7,"score1":101,"hash":"6eb5f3fc","dashEndBirdsPerDash":41.83,"eatMeanF0":1.56}
+{"seed":2,"warm":1500,"frames":4000,"harrier":true,"nFalcon":2,"sha":"205bd9a324526ffe","dKills":168,"dashEnds":43,"dashEndBirds":1403,"dashEndsF0":21,"dashEndsF1":22,"eatsF0":49,"eatsF1":44,"chainTriggers":36,"dashMaxEats":8,"falconClashes":2,"falconSteals":0,"sharedPcUses":2354,"eventDoubles":20,"shepherdFrames":3809,"evtBiasDashes":20,"steals":0,"clashes":2,"spdMean":5.392,"spdVar":3.2802,"roleHunter":4000,"roleAmbush":3982,"roleShepherd":18,"lastRoles":["hunter","ambush"],"score0":290.5,"score1":33.2,"hash":"cee98753","dashEndBirdsPerDash":32.63,"eatMeanF0":2.33}
+{"seed":3,"warm":1500,"frames":4000,"harrier":true,"nFalcon":2,"sha":"205bd9a324526ffe","dKills":170,"dashEnds":32,"dashEndBirds":1220,"dashEndsF0":15,"dashEndsF1":17,"eatsF0":45,"eatsF1":58,"chainTriggers":28,"dashMaxEats":8,"falconClashes":2,"falconSteals":0,"sharedPcUses":1840,"eventDoubles":18,"shepherdFrames":4391,"evtBiasDashes":19,"steals":0,"clashes":2,"spdMean":5.361,"spdVar":2.7684,"roleHunter":4000,"roleAmbush":3977,"roleShepherd":23,"lastRoles":["ambush","hunter"],"score0":107.6,"score1":141.8,"hash":"7a71b2ac","dashEndBirdsPerDash":38.13,"eatMeanF0":3}
+{"seed":4,"warm":1500,"frames":4000,"harrier":true,"nFalcon":2,"sha":"205bd9a324526ffe","dKills":192,"dashEnds":40,"dashEndBirds":1875,"dashEndsF0":21,"dashEndsF1":19,"eatsF0":44,"eatsF1":48,"chainTriggers":30,"dashMaxEats":8,"falconClashes":6,"falconSteals":0,"sharedPcUses":1928,"eventDoubles":18,"shepherdFrames":4034,"evtBiasDashes":18,"steals":0,"clashes":6,"spdMean":5.397,"spdVar":3.0342,"roleHunter":4000,"roleAmbush":3976,"roleShepherd":24,"lastRoles":["hunter","ambush"],"score0":195.9,"score1":165.1,"hash":"8e7b1ca7","dashEndBirdsPerDash":46.88,"eatMeanF0":2.1}
+{"seed":1,"warm":1500,"frames":4000,"harrier":true,"nFalcon":1,"sha":"205bd9a324526ffe","dKills":57,"dashEnds":19,"dashEndBirds":451,"dashEndsF0":19,"dashEndsF1":0,"eatsF0":25,"eatsF1":0,"chainTriggers":10,"dashMaxEats":6,"falconClashes":0,"falconSteals":0,"sharedPcUses":0,"eventDoubles":0,"shepherdFrames":0,"evtBiasDashes":0,"steals":0,"clashes":0,"spdMean":4.554,"spdVar":1.743,"roleHunter":4000,"roleAmbush":0,"roleShepherd":0,"lastRoles":["hunter"],"score0":4.8,"score1":0,"hash":"cf785db9","dashEndBirdsPerDash":23.74,"eatMeanF0":1.32}
+{"seed":2,"warm":1500,"frames":4000,"harrier":true,"nFalcon":1,"sha":"205bd9a324526ffe","dKills":60,"dashEnds":21,"dashEndBirds":791,"dashEndsF0":21,"dashEndsF1":0,"eatsF0":27,"eatsF1":0,"chainTriggers":10,"dashMaxEats":5,"falconClashes":0,"falconSteals":0,"sharedPcUses":0,"eventDoubles":0,"shepherdFrames":0,"evtBiasDashes":0,"steals":0,"clashes":0,"spdMean":4.694,"spdVar":1.7336,"roleHunter":4000,"roleAmbush":0,"roleShepherd":0,"lastRoles":["hunter"],"score0":-16.4,"score1":0,"hash":"0c994372","dashEndBirdsPerDash":37.67,"eatMeanF0":1.29}
+{"seed":3,"warm":1500,"frames":4000,"harrier":true,"nFalcon":1,"sha":"205bd9a324526ffe","dKills":51,"dashEnds":20,"dashEndBirds":463,"dashEndsF0":20,"dashEndsF1":0,"eatsF0":27,"eatsF1":0,"chainTriggers":9,"dashMaxEats":7,"falconClashes":0,"falconSteals":0,"sharedPcUses":0,"eventDoubles":0,"shepherdFrames":0,"evtBiasDashes":0,"steals":0,"clashes":0,"spdMean":4.487,"spdVar":1.8198,"roleHunter":4000,"roleAmbush":0,"roleShepherd":0,"lastRoles":["hunter"],"score0":33.5,"score1":0,"hash":"3b6b5bf5","dashEndBirdsPerDash":23.15,"eatMeanF0":1.35}
+{"seed":4,"warm":1500,"frames":4000,"harrier":true,"nFalcon":1,"sha":"205bd9a324526ffe","dKills":44,"dashEnds":19,"dashEndBirds":431,"dashEndsF0":19,"dashEndsF1":0,"eatsF0":16,"eatsF1":0,"chainTriggers":10,"dashMaxEats":5,"falconClashes":0,"falconSteals":0,"sharedPcUses":0,"eventDoubles":0,"shepherdFrames":0,"evtBiasDashes":0,"steals":0,"clashes":0,"spdMean":4.599,"spdVar":1.7644,"roleHunter":4000,"roleAmbush":0,"roleShepherd":0,"lastRoles":["hunter"],"score0":-24.5,"score1":0,"hash":"d8e144f9","dashEndBirdsPerDash":22.68,"eatMeanF0":0.84}
+{"seed":1,"warm":1500,"frames":4000,"harrier":false,"nFalcon":2,"sha":"205bd9a324526ffe","dKills":290,"dashEnds":39,"dashEndBirds":1718,"dashEndsF0":21,"dashEndsF1":18,"eatsF0":77,"eatsF1":58,"chainTriggers":38,"dashMaxEats":13,"falconClashes":6,"falconSteals":0,"sharedPcUses":1967,"eventDoubles":27,"shepherdFrames":4302,"evtBiasDashes":23,"steals":0,"clashes":6,"spdMean":5.443,"spdVar":2.9231,"roleHunter":4000,"roleAmbush":3982,"roleShepherd":18,"lastRoles":["ambush","hunter"],"score0":476,"score1":226,"hash":"29534a79","dashEndBirdsPerDash":44.05,"eatMeanF0":3.67}
+{"seed":2,"warm":1500,"frames":4000,"harrier":false,"nFalcon":2,"sha":"205bd9a324526ffe","dKills":232,"dashEnds":33,"dashEndBirds":1693,"dashEndsF0":15,"dashEndsF1":18,"eatsF0":67,"eatsF1":57,"chainTriggers":32,"dashMaxEats":8,"falconClashes":7,"falconSteals":0,"sharedPcUses":1967,"eventDoubles":23,"shepherdFrames":3582,"evtBiasDashes":21,"steals":0,"clashes":7,"spdMean":5.291,"spdVar":2.5467,"roleHunter":4000,"roleAmbush":3983,"roleShepherd":17,"lastRoles":["ambush","hunter"],"score0":691,"score1":774,"hash":"ec495895","dashEndBirdsPerDash":51.3,"eatMeanF0":4.47}
+{"seed":3,"warm":1500,"frames":4000,"harrier":false,"nFalcon":2,"sha":"205bd9a324526ffe","dKills":242,"dashEnds":38,"dashEndBirds":1742,"dashEndsF0":17,"dashEndsF1":21,"eatsF0":64,"eatsF1":67,"chainTriggers":40,"dashMaxEats":8,"falconClashes":5,"falconSteals":0,"sharedPcUses":1930,"eventDoubles":21,"shepherdFrames":4191,"evtBiasDashes":20,"steals":0,"clashes":5,"spdMean":5.558,"spdVar":2.8675,"roleHunter":4000,"roleAmbush":3980,"roleShepherd":20,"lastRoles":["ambush","hunter"],"score0":609,"score1":478,"hash":"5ed6a5a1","dashEndBirdsPerDash":45.84,"eatMeanF0":3.76}
+{"seed":4,"warm":1500,"frames":4000,"harrier":false,"nFalcon":2,"sha":"205bd9a324526ffe","dKills":222,"dashEnds":36,"dashEndBirds":1772,"dashEndsF0":18,"dashEndsF1":18,"eatsF0":67,"eatsF1":58,"chainTriggers":36,"dashMaxEats":8,"falconClashes":4,"falconSteals":0,"sharedPcUses":2177,"eventDoubles":18,"shepherdFrames":3965,"evtBiasDashes":18,"steals":0,"clashes":4,"spdMean":5.656,"spdVar":2.9488,"roleHunter":4000,"roleAmbush":3980,"roleShepherd":20,"lastRoles":["hunter","ambush"],"score0":216,"score1":81,"hash":"6b36a966","dashEndBirdsPerDash":49.22,"eatMeanF0":3.72}
+{"seed":1,"warm":1500,"frames":4000,"harrier":false,"nFalcon":1,"sha":"205bd9a324526ffe","dKills":79,"dashEnds":18,"dashEndBirds":404,"dashEndsF0":18,"dashEndsF1":0,"eatsF0":42,"eatsF1":0,"chainTriggers":10,"dashMaxEats":12,"falconClashes":0,"falconSteals":0,"sharedPcUses":0,"eventDoubles":0,"shepherdFrames":0,"evtBiasDashes":0,"steals":0,"clashes":0,"spdMean":4.7,"spdVar":1.658,"roleHunter":4000,"roleAmbush":0,"roleShepherd":0,"lastRoles":["hunter"],"score0":1,"score1":0,"hash":"dfde865c","dashEndBirdsPerDash":22.44,"eatMeanF0":2.33}
+{"seed":2,"warm":1500,"frames":4000,"harrier":false,"nFalcon":1,"sha":"205bd9a324526ffe","dKills":92,"dashEnds":19,"dashEndBirds":527,"dashEndsF0":19,"dashEndsF1":0,"eatsF0":39,"eatsF1":0,"chainTriggers":11,"dashMaxEats":7,"falconClashes":0,"falconSteals":0,"sharedPcUses":0,"eventDoubles":0,"shepherdFrames":0,"evtBiasDashes":0,"steals":0,"clashes":1,"spdMean":4.808,"spdVar":1.8394,"roleHunter":4000,"roleAmbush":0,"roleShepherd":0,"lastRoles":["hunter"],"score0":-3,"score1":0,"hash":"941f9d01","dashEndBirdsPerDash":27.74,"eatMeanF0":2.05}
+{"seed":3,"warm":1500,"frames":4000,"harrier":false,"nFalcon":1,"sha":"205bd9a324526ffe","dKills":78,"dashEnds":16,"dashEndBirds":508,"dashEndsF0":16,"dashEndsF1":0,"eatsF0":50,"eatsF1":0,"chainTriggers":15,"dashMaxEats":8,"falconClashes":0,"falconSteals":0,"sharedPcUses":0,"eventDoubles":0,"shepherdFrames":0,"evtBiasDashes":0,"steals":0,"clashes":0,"spdMean":4.865,"spdVar":1.618,"roleHunter":4000,"roleAmbush":0,"roleShepherd":0,"lastRoles":["hunter"],"score0":375,"score1":0,"hash":"898d4ecb","dashEndBirdsPerDash":31.75,"eatMeanF0":3.13}
+{"seed":4,"warm":1500,"frames":4000,"harrier":false,"nFalcon":1,"sha":"205bd9a324526ffe","dKills":67,"dashEnds":20,"dashEndBirds":494,"dashEndsF0":20,"dashEndsF1":0,"eatsF0":37,"eatsF1":0,"chainTriggers":12,"dashMaxEats":7,"falconClashes":0,"falconSteals":0,"sharedPcUses":0,"eventDoubles":0,"shepherdFrames":0,"evtBiasDashes":0,"steals":0,"clashes":0,"spdMean":4.832,"spdVar":1.8732,"roleHunter":4000,"roleAmbush":0,"roleShepherd":0,"lastRoles":["hunter"],"score0":-8,"score1":0,"hash":"85e705cd","dashEndBirdsPerDash":24.7,"eatMeanF0":1.85}
+
+=== 汇总 ===
+[集成(驱逐鸟开)] 隼×2  n=4
+   dashEndBirds/冲刺 = 41.83/32.63/38.13/46.88  均值 39.87  中位 39.98
+   Δ捕获(4000帧) = 183/168/170/192  均值 178.3
+   冲刺数 = 35/43/32/40   单冲刺吃数(隼①) = 1.56/2.33/3/2.1
+   速度方差(全隼合并) = 2.8454/3.2802/2.7684/3.0342  中位 2.9398
+   同盟豁免: 隼-隼互攻 10/2/2/6 · 隼-隼抢分 0/0/0/0 · 总抢分 0/0/0/0
+   四件套计数: 共享感知 2179/2354/1840/1928 · 事件双打 25/20/18/18 · 牧羊帧 4432/3809/4391/4034 · 偏向冲刺 22/20/19/18
+   角色帧(猎/伏/牧) = 4000/3981/19  4000/3982/18  4000/3977/23  4000/3976/24
+[集成(驱逐鸟开)] 隼×1  n=4
+   dashEndBirds/冲刺 = 23.74/37.67/23.15/22.68  均值 26.81  中位 23.45
+   Δ捕获(4000帧) = 57/60/51/44  均值 53.0
+   冲刺数 = 19/21/20/19   单冲刺吃数(隼①) = 1.32/1.29/1.35/0.84
+   速度方差(全隼合并) = 1.743/1.7336/1.8198/1.7644  中位 1.7537
+   同盟豁免: 隼-隼互攻 0/0/0/0 · 隼-隼抢分 0/0/0/0 · 总抢分 0/0/0/0
+   四件套计数: 共享感知 0/0/0/0 · 事件双打 0/0/0/0 · 牧羊帧 0/0/0/0 · 偏向冲刺 0/0/0/0
+   角色帧(猎/伏/牧) = 4000/0/0  4000/0/0  4000/0/0  4000/0/0
+[集成(驱逐鸟开)] 隼×2 / 隼×1 总捕获比: 逐种子 3.21/2.80/3.33/4.36  中位 3.27  均值 3.43
+[隔离(驱逐鸟关)] 隼×2  n=4
+   dashEndBirds/冲刺 = 44.05/51.3/45.84/49.22  均值 47.60  中位 47.53
+   Δ捕获(4000帧) = 290/232/242/222  均值 246.5
+   冲刺数 = 39/33/38/36   单冲刺吃数(隼①) = 3.67/4.47/3.76/3.72
+   速度方差(全隼合并) = 2.9231/2.5467/2.8675/2.9488  中位 2.8953
+   同盟豁免: 隼-隼互攻 6/7/5/4 · 隼-隼抢分 0/0/0/0 · 总抢分 0/0/0/0
+   四件套计数: 共享感知 1967/1967/1930/2177 · 事件双打 27/23/21/18 · 牧羊帧 4302/3582/4191/3965 · 偏向冲刺 23/21/20/18
+   角色帧(猎/伏/牧) = 4000/3982/18  4000/3983/17  4000/3980/20  4000/3980/20
+[隔离(驱逐鸟关)] 隼×1  n=4
+   dashEndBirds/冲刺 = 22.44/27.74/31.75/24.7  均值 26.66  中位 26.22
+   Δ捕获(4000帧) = 79/92/78/67  均值 79.0
+   冲刺数 = 18/19/16/20   单冲刺吃数(隼①) = 2.33/2.05/3.13/1.85
+   速度方差(全隼合并) = 1.658/1.8394/1.618/1.8732  中位 1.7487
+   同盟豁免: 隼-隼互攻 0/0/0/0 · 隼-隼抢分 0/0/0/0 · 总抢分 0/0/0/0
+   四件套计数: 共享感知 0/0/0/0 · 事件双打 0/0/0/0 · 牧羊帧 0/0/0/0 · 偏向冲刺 0/0/0/0
+   角色帧(猎/伏/牧) = 4000/0/0  4000/0/0  4000/0/0  4000/0/0
+[隔离(驱逐鸟关)] 隼×2 / 隼×1 总捕获比: 逐种子 3.67/2.52/3.10/3.31  中位 3.21  均值 3.15
+
+隔离臂 隼×2 物理哈希: 29534a79,ec495895,5ed6a5a1,6b36a966
+隔离臂 隼×2 dashMaxEats: 13,8,8,8  链触发: 38,32,40,36

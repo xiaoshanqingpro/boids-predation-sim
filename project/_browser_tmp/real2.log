@@ -1,0 +1,16 @@
+﻿msedge.exe : [31976:864:1015/130949.563:INFO:chrome\common\importer\edge_chrome_importer_utils_win.cc:34] Google chrome
+ user data path not found.
+所在位置 行:8 字符: 1
++ & $edge --headless=new --no-sandbox --disable-gpu-sandbox --no-first- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([31976:864:1015...path not found.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31976:864:1015/130949.565:ERROR:chrome\browser\importer\edge_china_browsers\edge_qqbrowser_importer_utils_win.cc:165] 
+QQBrowser user data path not found.
+[31976:47508:1015/130949.639:ERROR:components\edge_smartscreen\browser\smartscreen_dns_resolver.cc:109] SmartScreenDnsR
+esolver::OnComplete Error: -105 DidTimeOut: 0 URL: http://=auto/
+[31976:47508:1015/130949.675:INFO:CONSOLE:6150] "[ProtocolLaunch] handler constructed; wiring port events.", source: ch
+rome-extension://ndcpkimcihhghdcddljkfmmjccdmcmof/background.rollup.js (6150)
+[31976:47508:1015/130949.963:ERROR:components\headless\command_handler\headless_command_handler.cc:403] Page load faile
+d: net::ERR_NAME_NOT_RESOLVED

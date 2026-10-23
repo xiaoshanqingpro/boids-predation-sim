@@ -1,0 +1,13 @@
+﻿== golden on base(current world) ==
+FRAMES=2000 N=2000
+scores=468,-11,221 kills=9,9,43 aliveStarling=1946 aliveGoose=53
+leaderIdx=1 shift=59 juvenile=15 disarray=0
+falconPolicies=0/0/0.375000 0/0/0.375000
+PHYSICS_HASH=8b8c19c9
+== headless on base(current world) ==
+
+  ✗ N=2000 每步 14.18 ms (60FPS 预算 16.7ms, 需留渲染余量)
+结果: 149/150 项通过
+
+
+done

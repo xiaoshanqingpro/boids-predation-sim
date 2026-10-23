@@ -1,0 +1,2 @@
+{"html":"掠食竞赛(4).html","falconClashFrame":1,"dClashes":1,"dFalconClashes":1,"dSteals":0,"dFalconSteals":0,"dFalconAvoided":10,"scoreDeltaSum":0,"score0":[0,0],"score1":[1,1],"loserStunMax":90,"nextClashAfterFrames":-1,"nextClashDist":null,"moved0":5,"moved1":18.5,"traces":[{"f":1,"c":1,"fc":1,"d":"13.50"}]}
+PASS: 隼-隼互攻保留击退/眩晕/CLASH_CD>=45 帧, 且分数零转移(无扣分/无抢分)

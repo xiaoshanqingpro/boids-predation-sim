@@ -1,0 +1,49 @@
+﻿=== T4 W5 失速回归验证 ===
+html=掠食竞赛(4).html
+sha256=e0eed1b28628e9b1de2ea8af7335f67bc437e42e49e164f91ce8f0a26a454b5c
+帧数=8000 预热=1500 种子=[101,202,303,404] 判据=stallFrames >= attacks*45*0.9
+
+seed 101: attacks=23 stallFrames=999 ratio=0.965 PASS | hits=23 miss=0 结束剩余失速=36(缺口 0 帧) | 结算路径(命中 4/落空 0/打断 0) | 速度 5.52/6.50=0.850× | 转艏 max 176.07/177.16° (P95 4.81/10.83) | 失速 z 上升帧 221/977 / 主动加 vz 帧 0 | phys=1b2f75b0 kills=223
+seed 202: attacks=22 stallFrames=990 ratio=1.000 PASS | hits=22 miss=0 结束剩余失速=0(缺口 0 帧) | 结算路径(命中 5/落空 0/打断 0) | 速度 5.52/6.37=0.867× | 转艏 max 45.16/178.54° (P95 5.78/16.44) | 失速 z 上升帧 163/968 / 主动加 vz 帧 0 | phys=b8253ffb kills=229
+seed 303: attacks=24 stallFrames=1080 ratio=1.000 PASS | hits=24 miss=0 结束剩余失速=0(缺口 0 帧) | 结算路径(命中 5/落空 0/打断 0) | 速度 5.47/6.43=0.850× | 转艏 max 20.80/173.34° (P95 5.29/10.03) | 失速 z 上升帧 178/1056 / 主动加 vz 帧 0 | phys=99f2d93f kills=249
+seed 404: attacks=25 stallFrames=1102 ratio=0.980 PASS | hits=25 miss=0 结束剩余失速=23(缺口 0 帧) | 结算路径(命中 5/落空 0/打断 0) | 速度 5.47/6.37=0.859× | 转艏 max 18.22/170.57° (P95 5.17/12.92) | 失速 z 上升帧 147/1078 / 主动加 vz 帧 0 | phys=f6e2a0e1 kills=189
+
+汇总(4 种子): ratio 各轮 [0.965, 1.000, 1.000, 0.980] 中位 1.000 最小 0.965
+判据 stats.ghunterStallFrames >= attacks×45×0.9: PASS (按最小值判)
+效果核对(运行时): 速度比中位 0.859(期望≈0.85) | 失速转艏上限(解析) 6.016°/帧; 失速段超限帧: 互攻击退 0 / 其他 63(其中处于世界厌恶带内 59) / 非失速帧超过该上限的帧数 2235(>0 说明上限确实只在失速段收紧)
+  失速超限样例(非互攻): f3354(Δ15.7°, 距边 413px(厌恶带内), 最近驱逐鸟 216px, harrierDivesΔ0) f3355(Δ12.6°, 距边 412px(厌恶带内), 最近驱逐鸟 215px, harrierDivesΔ0) f3356(Δ8.6°, 距边 411px(厌恶带内), 最近驱逐鸟 214px, harrierDivesΔ0) f4583(Δ10.6°, 距边 410px(厌恶带内), 最近驱逐鸟 951px, harrierDivesΔ0) f4584(Δ15.1°, 距边 406px(厌恶带内), 最近驱逐鸟 944px, harrierDivesΔ0) f1532(Δ13.1°, 距边 391px(厌恶带内), 最近驱逐鸟 1276px, harrierDivesΔ0) f1533(Δ8.9°, 距边 390px(厌恶带内), 最近驱逐鸟 1275px, harrierDivesΔ0) f1861(Δ7.4°, 距边 392px(厌恶带内), 最近驱逐鸟 440px, harrierDivesΔ0) f1862(Δ6.4°, 距边 392px(厌恶带内), 最近驱逐鸟 437px, harrierDivesΔ0) f4966(Δ45.2°, 距边 944px, 最近驱逐鸟 37px, harrierDivesΔ0) f1565(Δ16.1°, 距边 416px(厌恶带内), 最近驱逐鸟 724px, harrierDivesΔ0) f2490(Δ10.5°, 距边 395px(厌恶带内), 最近驱逐鸟 1013px, harrierDivesΔ0) f5320(Δ18.0°, 距边 405px(厌恶带内), 最近驱逐鸟 643px, harrierDivesΔ0) f5321(Δ19.8°, 距边 399px(厌恶带内), 最近驱逐鸟 641px, harrierDivesΔ0) f5322(Δ20.8°, 距边 395px(厌恶带内), 最近驱逐鸟 636px, harrierDivesΔ0) f4562(Δ16.2°, 距边 397px(厌恶带内), 最近驱逐鸟 188px, harrierDivesΔ0) f4563(Δ18.2°, 距边 394px(厌恶带内), 最近驱逐鸟 185px, harrierDivesΔ0) f4564(Δ14.8°, 距边 393px(厌恶带内), 最近驱逐鸟 180px, harrierDivesΔ0) f4565(Δ9.5°, 距边 392px(厌恶带内), 最近驱逐鸟 175px, harrierDivesΔ0) f4580(Δ8.0°, 距边 414px(厌恶带内), 最近驱逐鸟 95px, harrierDivesΔ1)
+  失速段 z 上升帧 709/4079, 其中主动加升速(vz 变大)帧 0(期望 0)
+三条结算路径合计(运行时): 命中 94 / 落空日志 0 / 打断日志 0; stats.ghunterMiss 合计 0(落空+打断), 我按 attack/dashT 归类: 落空 0 / 打断 0
+
+=== ② 三条结算路径每条都设 stall(源码行号) ===
+  命中路径 ghunterResolve(定义):
+    L950: function ghunterResolve(g, what, victim) {
+    -> 设 stall 的行:
+    L955: g.stall = GH_STALL_FRAMES;         // W5 失速段开始(命中也要付俯冲代价)
+  被打断路径 ghunterAbort(定义):
+    L970: function ghunterAbort(g, why) {
+    -> 设 stall 的行:
+    L975: g.stall = GH_STALL_FRAMES;         // W5 被打断同样付出俯冲代价
+  落空路径(攻击窗口自然走完):
+    L2959: g.attack = 0; g.cool = GH_COOLDOWN; g.stall = GH_STALL_FRAMES; stats.ghunterMiss++;
+  失速计时/计数行:
+    L2852: if (g.stall > 0) { g.stall--; stats.ghunterStallFrames++; }   // W5 失速段计时(验收取证)
+  外部打断触发点(attack=1 且 dashT 被清零):
+    L2855: if (g.attack === 1 && g.dashT === 0) ghunterAbort(g, "外部打断");
+    L2922: if (g.attack === 1 && g.dashT === 0) ghunterAbort(g, "边界收势");
+
+=== ③ 失速段四效果(常量 + 判定行号) ===
+  常量:
+    L866: const GH_STALL_FRAMES = 45;                  // 攻击后的失速段帧数
+    L867: const GH_STALL_TURN = 0.3;                   // 失速段转艏上限倍率(0.35 -> 0.105 rad/帧)
+    L868: const GH_STALL_SPEED = 0.85;                 // 失速段巡航速度倍率
+    L869: const GH_STALL_CLASH_PEN = -2;               // 失速段互攻实力惩罚(冲刺+2 的反面)                // 体型(尖端/尾长/翼展): 比鹰再大一号
+  ① 转艏×GH_STALL_TURN:
+    L2970: const turnCap = (g.stall > 0 ? GH_MAX_TURN * GH_STALL_TURN : GH_MAX_TURN) * hpk;   // W5 失速段转艏受限 / W8 压力
+  ② 禁爬升(爬升限幅被置 0):
+    L3034: g.vz += clamp(des - g.vz, -GH_DIVE_RATE, g.stall > 0 ? 0 : GH_CLIMB_RATE);   // 垂向限幅 ×2(高机动); W5 失速段禁爬升
+  ③ 速度×GH_STALL_SPEED:
+    L2967: const slow = Math.max(0.6, 1 - g.mob * 0.01) * (g.stun > 0 ? 0.6 : 1) * (g.stall > 0 ? GH_STALL_SPEED : 1);   // W5 失速减速
+  ④ 互攻 −2:
+    L3057: const sA = (A.dashT > 0 ? 2 : 0) + (A.kind === "eagle" ? 1.5 : 0) + (A.stun > 0 ? -3 : 0) + (A.kind === "ghunter" && A.stall > 0 ? GH_STALL_CLASH_PEN : 0) + Math.ran
+    L3058: const sB = (B.dashT > 0 ? 2 : 0) + (B.kind === "eagle" ? 1.5 : 0) + (B.stun > 0 ? -3 : 0) + (B.kind === "ghunter" && B.stall > 0 ? GH_STALL_CLASH_PEN : 0) + Math.ran

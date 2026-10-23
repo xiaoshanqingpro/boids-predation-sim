@@ -1,0 +1,12 @@
+﻿import fs from "node:fs"; import vm from "node:vm";
+const html=fs.readFileSync("掠食竞赛.html","utf8"); const cut=html.indexOf('<script type="text/plain"');
+const code=[...(cut>0?html.slice(0,cut):html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join("\n;\n");
+const grad={addColorStop(){}}; const ctx=new Proxy({},{get:(t,p)=>(p in t?t[p]:(p==="createRadialGradient"||p==="createLinearGradient")?()=>grad:(p==="measureText"?()=>({width:10}):()=>{})),set:(t,p,v)=>(t[p]=v,true)});
+const els=new Map(); const el=id=>({id,textContent:"",innerHTML:"",value:"2000",checked:false,style:{},className:"",children:[],addEventListener(){},classList:{toggle(){},add(){},remove(){}},getContext:()=>ctx,appendChild(c){if(c&&c.id)els.set(c.id,c);return c},removeChild(c){return c},getBoundingClientRect:()=>({width:1280,height:720,left:0,top:0})});
+const d={getElementById:id=>{if(!els.has(id))els.set(id,el(id));return els.get(id)},addEventListener(){},createElement:()=>el("c"+Math.random())};
+const sb={document:d,window:{addEventListener(){},removeEventListener(){},location:{search:""}},location:{search:""},performance:{now:()=>Date.now()},requestAnimationFrame:()=>0,console};
+vm.createContext(sb); vm.runInContext(code,sb,{filename:"sim.js"});
+const SIM=sb.window.SIM; SIM.setGeometry(false); SIM.setN(2000); SIM.setGravity(true);
+for(let i=0;i<3000;i++) SIM.step();
+const s=SIM.stats;
+console.log("  3000 帧: 隼锥内帧="+s.coneFalconFrames+" 鹰锥内失血帧="+s.coneEagleDrain+" 总捕获="+s.kills);

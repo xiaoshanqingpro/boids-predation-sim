@@ -1,0 +1,27 @@
+/* 第 8 轮修正④ 验证: 隼/鹰都能减到 0, 期间不崩; "重置猛禽"能把缺员重建回默认编制 */
+import fs from "node:fs"; import vm from "node:vm";
+const html = fs.readFileSync("掠食竞赛.html", "utf8");
+const cut = html.indexOf('<script type="text/plain"');
+const code = [...(cut > 0 ? html.slice(0, cut) : html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join("\n;\n");
+const grad = { addColorStop() {} };
+const ctx = new Proxy({}, { get: (t, p) => (p in t ? t[p] : (p === "createRadialGradient" || p === "createLinearGradient") ? () => grad : (p === "measureText" ? () => ({ width: 10 }) : () => {})), set: (t, p, v) => (t[p] = v, true) });
+const els = new Map();
+const mk = id => ({ id, textContent: "", innerHTML: "", value: "2000", checked: false, style: {}, className: "", children: [], addEventListener() {}, classList: { toggle() {}, add() {}, remove() {} }, getContext: () => ctx, appendChild(c) { if (c && c.id) els.set(c.id, c); return c; }, removeChild(c) { return c; }, getBoundingClientRect: () => ({ width: 1280, height: 720, left: 0, top: 0 }) });
+const d = { getElementById: id => { if (!els.has(id)) els.set(id, mk(id)); return els.get(id); }, addEventListener() {}, createElement: () => mk("c" + Math.random()) };
+const sb = { document: d, window: { addEventListener() {}, removeEventListener() {}, location: { search: "" } }, location: { search: "" }, performance: { now: () => Date.now() }, requestAnimationFrame: () => 0, console };
+vm.createContext(sb); vm.runInContext(code, sb, { filename: "sim.js" });
+const SIM = sb.window.SIM;
+SIM.setGeometry(false); SIM.setN(2000); SIM.setGravity(true);
+const out = [];
+const T = (name, fn) => { try { out.push(name + ": " + JSON.stringify(fn())); } catch (e) { out.push(name + ": ✗ " + e.message); } };
+T("初始编制", () => SIM.raptorCount);
+T("隼减到 0", () => { let n = 0; while (SIM.raptorCount.falcons > 0) { SIM.removeFalcon(); n++; } return { 次数: n, count: SIM.raptorCount }; });
+T("隼0鹰1 跑 400 帧", () => { for (let i = 0; i < 400; i++) SIM.step(); return { count: SIM.raptorCount, scores: SIM.scores, kills: SIM.kills, alive: SIM.aliveCount }; });
+T("面板刷新(隼0)", () => { SIM.refreshPanel(); return (els.get("raidLine") || {}).textContent + " | " + (els.get("scoreSummary") || {}).textContent; });
+T("鹰也减到 0", () => { SIM.removeEagle(); for (let i = 0; i < 300; i++) SIM.step(); SIM.refreshPanel(); return { count: SIM.raptorCount, scores: SIM.scores, eps: SIM.eps, diet: SIM.diet }; });
+T("0 猛禽跑 300 帧", () => { for (let i = 0; i < 300; i++) SIM.step(); return { count: SIM.raptorCount, alive: SIM.aliveCount, 惊飞: SIM.stats.gooseAlerts }; });
+T("重置猛禽(应重建 2 隼 + 1 鹰)", () => { SIM.resetPredators(); return { count: SIM.raptorCount, refs: SIM.raptorRefs() }; });
+T("重建后跑 200 帧", () => { for (let i = 0; i < 200; i++) SIM.step(); return { count: SIM.raptorCount, kills: SIM.kills, alive: SIM.aliveCount }; });
+T("再加一只隼", () => { SIM.addFalcon(); return SIM.raptorCount; });
+T("重置猛禽(回到默认 2+1)", () => { SIM.resetPredators(); return SIM.raptorCount; });
+for (const l of out) console.log("  " + l);

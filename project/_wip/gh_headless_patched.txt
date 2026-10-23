@@ -1,0 +1,5 @@
+﻿✗ 绑定布局 9 项且访问类型正确(P/V/ALIVE 只读, ACC/HEAD/NXT 读写, Params uniform, WAL/WTN 只读 —— 因 W2 惊飞波同构新增 binding 7/8)
+✗ 创建 10 个 buffer(实测 8): P/V/ALIVE/ACC/HEAD/NXT/WAL/WTN/uniform/staging (W2 新增 WAL/WTN, 各 maxN*4 字节)
+✗ buffer 字节数符合 SoA 布局(HEAD=28116, NXT/WAL/WTN=80000, P/V/ACC/staging=160000)
+✗ 每帧上行 6 次(实测 4): P / V / ALIVE / WAL / WTN / uniform (W2 新增 WAL/WTN 上行)
+结果: 151/155 项通过

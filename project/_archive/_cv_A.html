@@ -1,0 +1,4285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>椋鸟群 · 雁编队 · 双隼轮换 · 学习鹰 —— 开阔世界掠食竞赛</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0c12; overflow: hidden;
+               display: flex; align-items: center; justify-content: center;
+               font-family: "Microsoft YaHei", system-ui, sans-serif; }
+  /* 双层画布: 底层 WebGL2 画鸟群与残影, 顶层 2D 画猛禽/标签/涟漪/小地图
+     (?render=2d 时只有顶层在工作, 走原来的 Canvas2D 全路径) */
+  #stage { position: relative; width: min(100vw, 177.78vh); aspect-ratio: 1280 / 720; }
+  #stage canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+  #glcv { z-index: 0; }
+  #cv   { z-index: 1; background: transparent; }
+
+  #panel {
+    position: fixed; top: 10px; right: 10px; z-index: 10; width: 274px;
+    background: rgba(18, 22, 32, 0.90); border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 10px; padding: 10px 12px; color: #ccc; font-size: 12px;
+    backdrop-filter: blur(4px); max-height: calc(100vh - 20px); overflow: auto;
+  }
+  #panel h1 { font-size: 13px; margin: 0 0 7px; color: #e8e8e8; font-weight: 600; letter-spacing: .5px;
+              display: flex; align-items: center; gap: 6px; }
+  #panel h1 .grow { flex: 1; white-space: nowrap; }
+  #panel h1 span { font-size: 10.5px; color: #7f9a5a; border: 1px solid #3c4a2c;
+                   border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+  /* 状态栏可收起: 收起后只剩这一条标题栏, 再按 H 或点按钮展开 */
+  #btnHide { background: transparent; border: 1px solid rgba(255,255,255,0.16); border-radius: 5px;
+             color: #9aa3b2; font-size: 11px; padding: 2px 7px; cursor: pointer; font-family: inherit;
+             white-space: nowrap; }
+  #btnHide:hover { background: #2e3850; color: #e8e8e8; }
+  #panel.collapsed { width: auto; padding: 6px 9px; }
+  #panel.collapsed #panelBody { display: none; }
+  #panel.collapsed h1 { margin: 0; }
+  #panel.collapsed #modeTag { display: none; }
+  #panel table { border-collapse: collapse; width: 100%; margin-bottom: 6px; }
+  #panel td, #panel th { padding: 2px 3px; }
+  #panel th { color: #8a8f9c; font-weight: 400; text-align: right; font-size: 11px; }
+  #panel td.num { text-align: right; font-variant-numeric: tabular-nums; color: #eee; }
+  #panel .sec { border-top: 1px solid rgba(255,255,255,.08); margin: 7px 0 6px; padding-top: 6px;
+                color: #8a8f9c; font-size: 11px; }
+  #panel .row { display: flex; gap: 6px; margin-bottom: 6px; }
+  #panel button { flex: 1; background: #232a3a; color: #ddd; border: 1px solid rgba(255,255,255,.14);
+                  border-radius: 6px; padding: 5px 0; font-size: 11.5px; cursor: pointer; font-family: inherit; }
+  #panel button:hover { background: #2e3850; }
+  #panel button.on { background: #3a4a2e; border-color: #7f9a5a; color: #dff0c0; }
+  #panel label.chk { display: inline-flex; align-items: center; gap: 3px; margin-right: 8px;
+                     color: #aab; font-size: 11.5px; cursor: pointer; }
+  #panel .sl { display: flex; align-items: center; gap: 6px; margin: 5px 0; color: #aab; }
+  #panel .sl input { flex: 1; min-width: 0; }
+  #panel .sl b { color: #eee; min-width: 46px; text-align: right; font-variant-numeric: tabular-nums;
+                 font-weight: 500; }
+  .dietbar { height: 8px; border-radius: 4px; overflow: hidden; background: #2a3040; display: flex; }
+  .dietbar i { display: block; height: 100%; }
+  #qcv { display: block; margin-top: 5px; border-radius: 4px; width: 250px; height: 100px; }
+  #fpsLine { color: #777; font-size: 11px; margin-top: 6px; line-height: 1.5; }
+  .hint { color: #5f6472; font-size: 10.5px; margin-top: 6px; line-height: 1.55; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="glcv" width="1280" height="720"></canvas>
+  <canvas id="cv" width="1280" height="720"></canvas>
+</div>
+
+<div id="panel">
+  <h1><span class="grow">掠食竞赛 <span id="modeTag">开阔世界</span></span><button id="btnHide" title="收起 / 展开面板（快捷键 H）">收起 ▸</button></h1>
+  <div id="panelBody">
+  <table>
+    <tr><th></th><th>得分</th><th>捕获</th></tr>
+    <tr><td style="color:rgb(235,70,70)">隼①</td><td class="num" id="s0">0</td><td class="num" id="k0">0</td></tr>
+    <tr><td style="color:rgb(70,150,255)">隼②</td><td class="num" id="s1">0</td><td class="num" id="k1">0</td></tr>
+    <tr><td style="color:rgb(255,190,60)">鹰</td><td class="num" id="s2">0</td><td class="num" id="k2">0</td></tr>
+    <tr><td style="color:rgb(200,215,235)">椋鸟存活</td><td class="num" id="aliveS" colspan="2">2000</td></tr>
+    <tr><td style="color:rgb(255,200,110)">雁存活</td><td class="num" id="aliveG" colspan="2">60</td></tr>
+  </table>
+
+  <div class="sec">鹰的食谱（椋鸟 : 雁）</div>
+  <div class="dietbar"><i id="dietS" style="background:rgb(200,215,235);width:50%"></i><i id="dietG" style="background:rgb(255,200,110);width:50%"></i></div>
+  <div id="dietText" style="color:#8a8f9c;font-size:11px;margin-top:3px">还没开张</div>
+
+  <div class="sec">鹰脑 Q 表（行 = 状态，列 = 动作；顶部亮线 = 贪心动作，半透明 = 领先不足 5%）</div>
+  <canvas id="qcv" width="250" height="100"></canvas>
+
+  <div class="sec">控制</div>
+  <div class="row"><button id="btnFlocks">重置鸟群</button><button id="btnPreds">重置猛禽</button></div>
+  <div class="row"><button id="btnScore">清空计分</button><button id="btnBrain">重置鹰脑</button></div>
+  <div class="row"><button id="btnPolicy">重置隼策</button><button id="btnPause">暂停（空格）</button></div>
+  <div class="row"><button id="btnAddFalcon">加入隼（F）</button><button id="btnAddEagle">加入鹰（E）</button></div>
+  <div class="row"><button id="btnFMinus">隼 −（⇧F）</button><button id="btnFPlus">隼 ＋（F）</button>
+    <button id="btnEMinus">鹰 −（⇧E）</button><button id="btnEPlus">鹰 ＋（E）</button></div>
+  <div class="row"><button id="btnView">切换俯视（T）</button><button id="btnCamReset">复位视角</button></div>
+  <div id="raidLine" style="color:#8b93b5;font-size:11px;margin-top:2px"></div>
+
+  <div class="sec">开关</div>
+  <div>
+    <label class="chk"><input type="checkbox" id="cbVision">视野圈</label>
+    <label class="chk"><input type="checkbox" id="cbForm" checked>编队线</label>
+    <label class="chk"><input type="checkbox" id="cbRefill" checked>自动补充</label>
+    <label class="chk"><input type="checkbox" id="cbTorus">环面</label>
+    <label class="chk"><input type="checkbox" id="cbGravity" checked>重力</label>
+    <label class="chk"><input type="checkbox" id="cbAuto" checked>自动环绕</label>
+  </div>
+
+  <div class="sec">参数</div>
+  <div class="sl">椋鸟 N <input type="range" id="rgN" min="500" max="20000" step="500" value="2000"><b id="vN">2000</b></div>
+  <div class="sl">拓扑邻居 K <input type="range" id="rgK" min="3" max="14" step="1" value="7"><b id="vK">7</b></div>
+  <div class="sl">时间倍速 <input type="range" id="rgSpeed" min="0.25" max="3" step="0.25" value="1"><b id="vSpeed">1×</b></div>
+
+  <div id="fpsLine">FPS: --</div>
+  <div class="hint">
+    快捷键：空格 暂停 · H 收起/展开状态栏 · R 重置鸟群 · C 清空计分 · B 重置鹰脑 · V 视野圈<br>
+    开阔世界：视口外还有 170px 缓冲带，鸟能飞出画面再回来；猛禽只有局部
+    视野，看不见猎物时靠记忆点搜索 —— 打开「环面」可切换成无边界穿屏世界。<br>
+    <span style="color:#7f9a5a">第 2 轮：空冲刺扣分 · 代谢成本 · 椋鸟围攻(mobbing) · 冲刺锁定(迷惑)
+    · 鹰隼互攻(驱逐/眩晕/抢分) · 体型与判定收小 · 鸟群收紧。</span><br>
+    <span style="color:#7f8aae">第 4 轮：猛禽采样目标获取(捞勺) · 雁群中心化(领队智能/轮值/幼雁内道/威慑锥/斩首混乱)
+    · 隼的 (1+1)-ES 策略进化 · 雁借椋鸟惊飞网预警。浅蓝扇形 = 雁群威慑锥。</span><br>
+    <span style="color:#9a8fae">第 5 轮：热循环零分配(链表池化网格/环形缓冲) · WebGL 实例化渲染(双层画布,
+    鸟群走 GPU, 猛禽与 UI 仍在 2D 叠加层)。加 ?render=2d 可对比旧 Canvas2D 全路径。</span><br>
+    <span style="color:#8fb8a0">第 8 轮：三维化 + 重力 —— 默认 3D 环绕视角(左键拖拽旋转 · 滚轮缩放 ·
+    T 切换俯视 · 复位视角); 重力/定高弹簧/俯冲红利/尸体下坠(重力勾选可关, 关掉即旧 2D 行为);
+    隼/鹰数量一键增减(⇧F/⇧E 或面板按钮)。?view=top 可从俯视启动。</span>
+  </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================================
+ * 掠食竞赛 —— 两个版本的整合体
+ * ----------------------------------------------------------------------------
+ * 种群(4 方, 各有各的"智能"层次):
+ *   1. 椋鸟 N 只:  拓扑 boids —— 每只只与最近的 K 只互动(不是半径内全部),
+ *                  凝聚/对齐/分离 + 逃逸, 没有领头的, 秩序纯靠局部规则涌现。
+ *   2. 雁群 M 只:  领队制 V 编队, 每只有固定槽位(角色记忆); 危险时编队让位
+ *                  给逃逸, 危险过后自动重组。椋鸟的对照组。
+ *   3. 隼 ×2:      本能 + 协作。能量轮换(一只追猎、一只设伏), 设伏方高速赶往
+ *                  "拦截位", 冲刺受 ±60° 航向约束。
+ *   4. 鹰 ×1:      Q-learning 在线学猎物偏好(追椋鸟 / 追雁 / 游荡伏击 /
+ *                  攻击竞争者), 巡航比隼快、冲刺比隼弱。
+ *   计分: 椋鸟 +1, 雁 +100, 三方竞赛。猛禽之间还会互攻驱遂(见 6.9)。
+ *
+ * 反制机制(第 2 轮新增): 空冲刺扣分(A) · 代谢成本(B) · 椋鸟围攻 mobbing(C)
+ *   · 冲刺锁定/迷惑(D) · 鹰隼互攻(E) —— 让"一头扎进鸟群"不再是免费午餐。
+ * 第 4 轮: 猛禽改用采样目标获取(80 个极坐标候选点 + 方向滞后 + LOCK_R 锁定);
+ *   雁群中心化重构(领队智能/轮值 apex/幼雁内道/威慑锥/斩首混乱);
+ *   隼的 (1+1)-ES 在线策略进化(与鹰的 Q-learning 并存); 雁借椋鸟惊飞网预警。
+ *   细节与常量表见文末交接说明的"第 4 轮之一~之五"五节。
+ *
+ * 几何(两版整合的关键取舍, 可用「环面」开关切换):
+ *   默认 = 开阔世界: 视口 1280×720 之外还有 170px 缓冲带, 出界只受柔和的
+ *          边界力, 没有穿屏瞬移 —— 鸟能飞出画面、猛禽会跟丢。
+ *   可选 = 环面 torus: 世界就是视口大小, 四周穿屏, 所有相对向量走 minImage。
+ *   两种模式下几何运算统一走 wrapX/wrapY/minImageX/minImageY, 互不干扰。
+ *
+ * 感知: 猛禽没有全局视野。perceive() 只统计视野半径内的椋鸟(网格桶预筛 +
+ *       逐只精确判距)与最近的雁; 视野空时靠成员记忆(freshMem)继续搜索。
+ *
+ * 每帧顺序: 网格 -> 椋鸟力扫描 -> 迁徙 -> 椋鸟积分/被捕食/逃逸/围攻 -> 雁 ->
+ *           鹰(Q-learning) -> 隼(能量轮换) -> 自动补充 -> 鹰隼互攻 -> 渲染。
+ * ========================================================================== */
+
+/* ------------------------------ 0. 世界与几何 ------------------------------ */
+
+const W = 1280, H = 720;          // 视口(画布)尺寸
+const PAD_OPEN = 170;             // 开阔世界的视口外缓冲带宽度
+const MAXN = 20000;               // 椋鸟数组预分配上限(任务0 基准要跑到 N=20000)
+let   N = 2000;                   // 当前椋鸟数
+const M = 60;                     // 雁数(须为偶数, V 形左右臂对称)
+let   PAD = PAD_OPEN;             // 当前缓冲带(环面模式为 0)
+let   TORUS = false;              // false = 开阔世界(软边界), true = 环面(穿屏)
+let   GW = 1, GH = 1;             // 网格桶数量
+
+/* ------------------------------ 1. 参数区 ------------------------------ */
+
+const TAU = Math.PI * 2;
+
+// ---- 椋鸟: 拓扑 boids ----
+// G: 收紧鸟群 —— 凝聚压过对齐(COHESION 2.0 > ALIGNMENT 1.2), 允许更近身位
+//    (SEP 20), 转向更有力(MAX_FORCE 0.15), 感知/网格桶缩到 50。K 仍为 7。
+// 第 7 轮: 再收紧两档 —— 分离半径 20->11, 感知/桶 50->36(候选数不会因变密而爆炸), 
+//    个体体积同步缩小(见 BODY 常量), 于是"鸟与鸟之间"看起来近了一倍。
+const PERCEPTION = 36.0;                 // 候选收集半径(再从中取最近 K 只)
+const PERCEPTION_R2 = PERCEPTION * PERCEPTION;
+const CELL = PERCEPTION;                 // 网格桶边长(recomputeGridSize 自动跟随)
+let   topoK = 7;                         // 拓扑邻居数 K(滑杆可调, 上限 TOPO_MAX)
+const TOPO_MAX = 16;
+const SEP_R2 = 11.0 * 11.0;              // 分离触发半径(第 7 轮: 20 -> 14 -> 11)
+const SEP_GAIN = 4.0;                    // 距离加权分离: 越近推得越狠
+const MAX_SPEED = 3.6;
+const MAX_FORCE = 0.15;
+const COHESION_W = 2.0, ALIGNMENT_W = 1.2;
+const CENTROID_FORCE = 0.015;            // 极弱质心引力, 防永久碎裂(散得太开时提到 0.025)
+const MIGRATE_FORCE = 0.06;              // 迁徙倾向, 把群体拉成流动飘带
+
+/* ---- 第 7 轮: 个体体积再收小一档(2D 与 WebGL 两条渲染路径共用同一组数字) ----
+ * drawArrow(x, y, vx, vy, 尖端, 尾长, 翼展); GL 那边用 glScene.shapes 的同一组值。 */
+const BODY_S = [1.6, 1.0, 1.0];          // 椋鸟(原 2.2 / 1.4 / 1.4)
+const BODY_G = [2.1, 1.2, 1.3];          // 雁  (原 3.2 / 1.8 / 2.0)
+const BODY_F = [4.8, 4.0, 2.6];          // 隼  (原 6.5 / 5.5 / 3.6)
+const BODY_E = [5.5, 4.4, 3.0];          // 鹰  (原 7.5 / 6.0 / 4.2)
+const BOUND_FORCE = 0.30;                // 开阔世界的柔性边界力
+
+// ---- 捕食与计分 ----
+// F: 个体与判定一起缩小 —— 视觉尺寸, 判定圈同步收(9/12 而非 12/15)
+const EAT_R2_S = 9 * 9;                  // 椋鸟被吃半径
+const EAT_R2_G = 12 * 12;                // 雁被吃半径
+const SCORE_STARLING = 1, SCORE_GOOSE = 100;
+
+// ---- 逃逸(鸟对猛禽) ----
+const FLEE_R2 = 110.0 * 110.0;
+const FLEE_FORCE = 0.45, FLEE_W = 2.2;
+
+// ---- 隼: 能量轮换 + 拦截位 ----
+const CIRCLE_SPEED = 5.0;                // 盘旋速度
+const DASH_SPEED = 8.5;                  // 冲刺速度(爆发型)
+const REST_SPEED = 7.5;                  // 设伏方赶路速度(快于盘旋, 保证赶到)
+const CIRCLE_FRAMES = 110;               // 两次冲刺间至少盘旋的帧数
+const CIRCLE_TURN = 0.07;                // 盘旋时每帧转向角
+const DASH_EXTRA = 180.0;                // 冲刺时长 = (距离+余量)/速度
+const DASH_MAX_DIST = 500;               // 冲刺距离上限(防止横穿整个世界)
+const DASH_MAX_ANGLE = Math.PI / 3;      // 冲刺方向与当前航向最大夹角 60°
+const ENERGY_MAX = 100;
+const DASH_DRAIN = 0.55;
+const ACTIVE_REGEN = 0.40;
+const REST_REGEN = 0.90;
+const ENERGY_LOW = 25;                   // 低于此值退出追猎, 交棒
+const DASH_MIN = 35;                     // 发起冲刺所需最低能量
+const DOUBLE_TEAM_E = 85;                // 设伏方能量高于此且距密集点近 -> 偶发双打
+const INTERCEPT_GAIN = 0.35;             // 向拦截位靠拢的力度(转向上限)
+const INTERCEPT_MIN = 90;                // 距拦截位小于此值则原地绕圈等待
+const INTERCEPT_AHEAD = 0.55;            // 拦截位 = 质心沿"远离追猎方"方向外推的比例
+const VIEW_FALCON = 420.0;
+const VIEW_FALCON_R2 = VIEW_FALCON * VIEW_FALCON;
+
+// ---- 鹰: 体格 + Q-learning ----
+const EAGLE_CRUISE = 5.8;                // 巡航比隼快: 耐力型, 靠长距离追猎耗死雁
+const EAGLE_DASH = 7.2;                  // 冲刺比隼弱(隼 8.5)
+const EAGLE_DASH_FRAMES = 18;
+const EAGLE_DASH_CD = 60;
+const EAGLE_DASH_TRIGGER = 140;
+const AMBUSH_LEAD = 45;                  // 伏击点沿群体行进方向外推的帧数
+// 决策纪元: 选定的动作保持这么多帧再重抽(1 = 逐帧重抽, 与原行为完全一致)。
+// 试过 =20: 能让"追雁"这种要几百帧的动作真正被执行, 个别种子上 Q 表能拉开差距
+// (例如 雁近行 11.5 vs 3.7), 但 4 粒种子的通过率没有改善(2/4 -> 2/4), 因为
+// 逐帧探索噪声虽多, 却补偿了决策数; 默认回到 1, 想试就改成 20。
+const EAGLE_DECIDE_EVERY = 1;
+const VIEW_EAGLE = 520.0;                // 鹰飞得高看得远
+const VIEW_EAGLE_R2 = VIEW_EAGLE * VIEW_EAGLE;
+const Q_ALPHA = 0.1, Q_GAMMA = 0.995;    // 学习率 / 折扣因子(每帧)
+// 注意 Q_GAMMA 是"每帧"折扣: 追一次雁要几百帧, 所以必须接近 1(0.995 -> 半衰期
+// 约 140 帧)。原版用 0.95(半衰期 14 帧), 信用在几步内就衰减光了, 长程追猎
+// 根本学不出来, Q 表退化成噪声 —— 这是整合时修掉的一个真问题。
+const EPS0 = 0.3, EPS_MIN = 0.08, EPS_DECAY = 0.9995;
+// 状态 = (猎物类型 0椋鸟/1雁) × (距离档 0近/1中/2远) = 6 态, 加 1 个"视野全空"态
+const STATE_NONE = 6;
+const N_STATES = 7, N_ACTIONS = 4;
+// E: 动作表扩到 4 —— 0追椋鸟密集处 1追最近雁 2游荡伏击 3攻击竞争者(最近的隼)
+//    Q 索引用 state*N_ACTIONS+a, 切忌再写字面量 *3。
+
+// ---- 雁群: 领队制 V 编队 ----
+const MAX_SPEED_G = 4.4;                 // 雁比椋鸟快: 靠速度 + 编队 + 预警自保
+const LEADER_SPEED = 4.0;
+const SLOT_SPACING = 15;
+const SLOT_FORCE = 0.14;
+const FORMATION_BREAK = 150.0;           // 猛禽接近到此距离, 编队解散逃逸
+const GSEP_R2 = 10 * 10;
+
+/* ---- 新增机制常量(本次 A~E) ----------------------------------------
+ * 惩罚/代谢、围攻、迷惑、互攻四套机制共用; 只扣 score, 不动 kills/diet。 */
+// A: 空冲刺扣分 —— 冲刺一下什么也没吃到就罚分(隼重、鹰轻)
+const MISS_PENALTY_FALCON = 4;
+const MISS_PENALTY_EAGLE = 2;            // 学习被新机制淹没 -> 按规格建议从 3 降到 2
+// B: 代谢成本(每帧) —— 盘旋/冲刺/鹰巡航都要烧能量, 让"不动的伏击"也有代价
+const METAB_CIRCLE = 0.002;
+const METAB_DASH = 0.010;
+const METAB_EAGLE = 0.003;
+// C: 围攻(mobbing) —— 一部分椋鸟是"围攻者", 靠近猛禽就结成骚扰环
+const MOB_FRACTION = 0.08;               // 椋鸟里围攻者的比例
+const MOB_R = 170;                       // 围攻者的响应半径
+const MOB_HARASS = 55;                   // 骚扰环半径: 环外逼近、环内推开
+const MOB_MAX = 0.05;                    // 骚扰转向力上限
+const MOB_DRAIN_PER = 0.04;              // 每只围攻者让冲刺能耗增加的比例
+const MOB_PENALTY_N = 25;                // 同一帧内围攻者数 >= 此值 -> 冲刺被硬生生打断
+const MOB_SLOW_FALCON = 0.6;             // 非冲刺速度下限(隼)
+const MOB_SLOW_EAGLE = 0.7;              // 非冲刺速度下限(鹰)
+// D: 迷惑效应 —— 冲刺锁定单个目标, 冲刺期间只吃得到"被锁定那一只"
+const DASH_LOCK = true;
+// E: 鹰隼互攻(驱逐制) —— 靠太近就分胜负, 输的眩晕/被击退/扣分并被抢分
+const CLASH_R = 34;                      // 触发互攻的距离
+const CLASH_STUN = 90;                   // 败方眩晕帧数
+const CLASH_KNOCK = 11;                  // 败方被击退的距离
+const CLASH_COST = 10;                   // 败方扣分
+const STEAL_FRAC = 0.2;                  // 胜方抢走败方剩余分数的比例
+const CLASH_CD = 45;                     // 同一对猛禽的互攻冷却(否则会逐帧连环扣分)
+const RIVAL_R = 150;                     // 隼启动"驱逐冲刺"的对手距离
+
+/* ---- 第 4 轮新增常量 --------------------------------------------------
+ * 第一部分: 猛禽采样目标获取(极坐标捞勺) · 第二部分: 雁群中心化重构
+ * 第三部分: 隼的 (1+1)-ES 策略进化 · 第四部分: 雁借用椋鸟网的惊飞预警 */
+
+// 1. 采样目标获取: 以猛禽为原点的极坐标候选点, 统计每个点"捞勺"里的鸟数
+const SAMPLE_RADII = [80, 160, 240, 320, 400];   // 采样环半径
+const SAMPLE_ANGLES = 16;                        // 每环角度数(共 5×16 = 80 个候选)
+const SCOOP_R = 60;                              // 捞勺半径: 候选点周围多少 px 内的鸟被计入
+const SCOOP_R2 = SCOOP_R * SCOOP_R;
+const LOCK_R = 40;                               // 锁定半径: 冲刺中心这么多 px 内最近的鸟被锁
+const LOCK_R2 = LOCK_R * LOCK_R;
+const DIR_LAG = 0.3;                             // 方向滞后: score *= 1 + DIR_LAG·cos(候选方向, 当前航向)
+const N_CAND = SAMPLE_RADII.length * SAMPLE_ANGLES;
+
+// 2. 雁群中心化重构
+const LEADER_SENSE_R = 400;                      // 领队感知猛禽的半径
+const LEADER_MAX_TURN = 0.04;                    // 领队转向限速(弧度/帧)
+const ESCAPE_HUSTLE = 1.15;                      // 威胁 250px 内领队速度倍率
+const LEADER_PANIC_R = 250;
+const GOOSE_MAX_TURN = 0.06;                     // 每只雁的转向限速(弧度/帧, 压坡惯性)
+const ROTATE_FRAMES = 1200;                      // 轮值领队周期(20 秒)
+const JUVENILE_FRAC = 0.25;                      // 幼雁比例(固定占内道槽位)
+const JUVENILE_DEBUFF_FRAMES = 1800;             // 幼雁死亡后的沮丧期
+const DEBUFF_FACTOR = 0.7;                       // 沮丧期内全体归位力倍率
+const CONE_R = 180;                              // 威慑锥半径(V 尖为顶点)
+const CONE_HALF_ANGLE = Math.PI / 3;             // 威慑锥半角 60°(正面 120°)
+const CONE_COS = Math.cos(CONE_HALF_ANGLE);
+const CONE_SCORE_FACTOR = 0.25;                  // 锥内候选点打分乘项(选目标自己绕开正面)
+const CONE_FALCON_DASH_MULT = 2;                 // 锥内隼的冲刺能耗倍率
+const CONE_EAGLE_DRAIN = 0.01;                   // 锥内鹰每帧 pending 失血
+const DISARRAY_FRAMES = 90;                      // 斩首后的混乱期(槽位力关闭)
+
+// 3. 隼的 (1+1)-ES 在线进化
+const ES_EVAL_FRAMES = 3600;                     // 一个评估期 60 秒(适应度噪声大, 期长配对比较)
+const ES_SIGMA = 0.1;                            // 候选参数 = 当前 + N(0, σ), 截断到 [0,1]
+const ES_MISS_WEIGHT = 2;                        // 适应度里落空罚款的权重
+const ES_METAB_WEIGHT = 5;                       // 适应度里代谢成本的权重
+const P_DASH_MIN = [20, 60, 35];                 // p1 出手能量阈值 [下界, 上界, 默认]
+const P_ENERGY_LOW = [10, 40, 25];               // p2 交棒能量阈值
+const P_DOUBLE_TEAM = [60, 95, 85];              // p3 双打能量阈值
+const P_INTERCEPT = [0.3, 0.8, 0.55];            // p4 拦截位外推比例
+const P_MOB_TOL = [0, 2, 1.0];                   // p5 mob 容忍(乘在 DASH_DRAIN 的 mob 项上)
+const ES_NP = 5;                                 // 可学习参数个数(p6 线性冲刺策略留作扩展位, 见交接说明)
+
+// 4. 雁借用椋鸟网的惊飞预警
+const PV_ALERT_COS = 0.5;                        // 惊飞判据: 相邻两帧速度夹角 > 60°(cos<0.5)
+const ALERT_R = 140;                             // 雁查惊飞椋鸟的半径
+const ALERT_R2 = ALERT_R * ALERT_R;
+const ALERT_N = 3;                               // 半径内惊飞椋鸟 >= 3 -> 视同猛禽逼近
+const ALERT_FALSE_R = 400;                       // 判定"误报"的半径(最近猛禽比这还远)
+
+// ---- 感知记忆 / 自动补充 / 拖尾 ----
+/* ---- 第 8 轮: 三维化 + 重力 ----
+ * 架构: xy 保持现有交错数组(P/V/ACC/PV 每只 2 个 float)一行不动 —— 网格/perceive/
+ * WebGPU 计算/2D 俯视/golden 哈希全部原样保留; z 轴独立数组(Z/VZ), 重力与定高弹簧
+ * 只作用于 z。2D 俯视(GRAV_ON 关掉时)与旧版逐位一致, 3D 只是渲染+z 动力学的增量。 */
+const Z_INIT = 170;                    // 初始飞行高度
+const Z_SPREAD = 70;                   // 初始高度散布(云团厚度)
+const G_GRAV = 0.045;                  // 重力 px/帧²(椋鸟/雁由定高弹簧对抗; 猛禽俯冲吃红利)
+const ALT_SPRING = 0.008;              // 定高弹簧: 朝群体均高的弱回复力, 与重力平衡 -> 悬浮云团
+const FLOOR_Z = 0;                     // 地面
+const FLOOR_PUSH = 0.35;               // 近地推升力(活鸟不落地, 尸体除外)
+const CLIMB_RATE = 0.14, DIVE_RATE = 0.26;   // 猛禽垂直速率限幅(爬升慢/俯冲快)
+const DIVE_BOOST = 0.16;               // 俯冲红利: 冲刺速度 += max(0,-vz)·DIVE_BOOST(游隼 stoop)
+const GROUND_MARGIN = 30;              // 猛禽近地拉起高度(不许俯冲撞地)
+let   GRAV_ON = true;                  // 重力总开关(面板勾选, 关掉即退化为旧 2D 行为)
+let   zMeanLive = Z_INIT;              // 群体实时均高(相机跟踪用)
+
+const MEM_FRAMES = 300;                  // 看不见猎物时, 记忆点有效期(帧)
+const REFILL_RATIO = 0.35;               // 椋鸟存活低于此比例 -> 补一波
+const REFILL_G_RATIO = 0.5;              // 雁存活低于此比例 -> 补回编队
+const REFILL_CHECK = 300;                // 每多少帧检查一次
+const TRAIL_LEN = 50;
+
+/* ------------------------------ 2. 工具函数 ------------------------------ */
+
+const clamp = (x, lo, hi) => x < lo ? lo : (x > hi ? hi : x);
+
+// 环面最小像: 开阔世界里是恒等映射, 环面时把相对坐标折回 [-W/2, W/2]
+const minImageX = d => TORUS ? d - W * Math.round(d / W) : d;
+const minImageY = d => TORUS ? d - H * Math.round(d / H) : d;
+// 位置收拢: 开阔世界用硬夹紧兜底(软边界力已经在推回来了), 环面直接取模
+const wrapX = x => TORUS ? ((x % W) + W) % W : clamp(x, -PAD - 60, W + PAD + 60);
+const wrapY = y => TORUS ? ((y % H) + H) % H : clamp(y, -PAD - 60, H + PAD + 60);
+
+const angDiff = (a, b) => {
+  let d = (a - b + Math.PI) % TAU;
+  if (d < 0) d += TAU;
+  return d - Math.PI;
+};
+
+// Box-Muller 高斯采样, 让初始群体成团而非均匀撒布
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
+}
+
+function recomputeGridSize() {
+  GW = Math.max(1, Math.ceil((W + 2 * PAD) / CELL));
+  GH = Math.max(1, Math.ceil((H + 2 * PAD) / CELL));
+  allocGrid();
+}
+
+// 开阔世界的柔性边界: 越过缓冲带边界才受力, 没有空气墙
+function applyBoundary(o, k) {
+  if (TORUS) return;
+  if (o.x < -PAD) o.vx += BOUND_FORCE * k;
+  else if (o.x > W + PAD) o.vx -= BOUND_FORCE * k;
+  if (o.y < -PAD) o.vy += BOUND_FORCE * k;
+  else if (o.y > H + PAD) o.vy -= BOUND_FORCE * k;
+}
+
+const freshMem = o => frame - o.memT < MEM_FRAMES;
+
+/* --------------------- 3. 种群状态与初始化 --------------------- */
+
+// ---- 椋鸟: 紧凑数组布局(预分配到 MAXN, 滑杆改 N 不需要重新分配) ----
+const P = new Float32Array(MAXN * 2);
+const V = new Float32Array(MAXN * 2);
+const ACC = new Float32Array(MAXN * 2);
+const alive = new Uint8Array(MAXN);
+const isMobber = new Uint8Array(MAXN);    // C: 该鸟是不是"围攻者"(开局按概率抽取)
+const PV = new Float32Array(MAXN * 2);    // P4: 上一帧速度(惊飞判据用)
+const startled = new Uint8Array(MAXN);    // P4: 本帧是否惊飞(必须在覆盖 PV 之前算出来)
+const Z = new Float32Array(MAXN);         // 第 8 轮: 高度(z 轴, 与 xy 解耦)
+const VZ = new Float32Array(MAXN);        // 第 8 轮: 垂直速度
+let aliveCount = 0;
+// 死亡涟漪: 定容环形池(旧版是数组 push + render 里 splice, 每帧都在挪内存)
+const DEATH_CAP = 512;
+const deathX = new Float32Array(DEATH_CAP), deathY = new Float32Array(DEATH_CAP), deathT = new Float32Array(DEATH_CAP);
+let deathCursor = 0;
+function addDeath(x, y) {
+  deathX[deathCursor] = x; deathY[deathCursor] = y; deathT[deathCursor] = 1;
+  deathCursor = (deathCursor + 1) % DEATH_CAP;
+}
+
+// ---- 雁 ----
+const P2 = new Float32Array(M * 2);
+const V2 = new Float32Array(M * 2);
+const Z2 = new Float32Array(M);           // 第 8 轮: 雁的高度
+const VZ2 = new Float32Array(M);
+const galive = new Uint8Array(M);
+let galiveCount = M;
+let leaderAng = 0, Lx = 0, Ly = 0;        // 虚拟领队(位置 = 当前 apex 雁的位置)
+// P2: 中心化秩序的状态
+let gooseShift = 0;                       // 槽位序号平移量: slot(i) = (i + gooseShift) % M
+let leaderIdx = 0;                        // 当前 apex 雁(轮值领队)
+let disarray = 0;                         // 斩首混乱期剩余帧数
+let gooseDebuff = 0;                      // 幼雁死亡后的沮丧期剩余帧数
+const slotRank = new Int16Array(M);       // 槽位 -> 排号(0 = apex)
+const slotArm = new Int8Array(M);         // 槽位 -> ±1(左右臂)
+let juvCount = 0;                         // 幼雁只数(固定个体: i % 4 === 0)
+function isJuvenile(i) { return i % 4 === 0; }   // 25%(M=60 -> 15 只)
+
+// ---- 网格哈希(每帧重建): 经典链表池化, 零分配 ----
+// 旧版是 Map<key, number[]> + 每帧新建数百个小数组 -> GC 锯齿。
+// 现在: head = Int32Array(GW*GH) 每帧只 fill(-1), next = Int32Array(MAXN) 存同桶后继;
+// 插桶 O(1), 遍历走 next 链, 全程定型数组, 没有任何堆分配。
+const gridNext = new Int32Array(MAXN);
+let gridHead = new Int32Array(1);
+let cellOrder = new Int32Array(1), cellOrderN = 0;   // 桶的"首次出现顺序"(= 旧 Map 的插入顺序)
+let chainBuf = new Int32Array(MAXN);                 // 逆链成升序用
+function allocGrid() {
+  const n = Math.max(1, GW * GH);
+  gridHead = new Int32Array(n);
+  cellOrder = new Int32Array(n);
+}
+const cellOf = (x, y) =>
+  clamp(Math.floor((y + PAD) / CELL), 0, GH - 1) * GW +
+  clamp(Math.floor((x + PAD) / CELL), 0, GW - 1);
+
+// ---- 拓扑邻居复用的临时数组(避免每帧分配) ----
+const KD = new Float64Array(TOPO_MAX);
+const KX = new Float64Array(TOPO_MAX), KY = new Float64Array(TOPO_MAX);
+const KJ = new Int32Array(TOPO_MAX);
+
+// ---- 猛禽 ----
+// mem: 最后一次"看到猎物"的位置(帧号), 用于开阔世界里继续搜索
+// dashEats: 本次冲刺吃到几只(A: 冲刺结束仍为 0 -> 空冲刺罚款)
+// mob: 本帧被几只围攻者围住(C)  stun: 互攻败北后的眩晕帧数(E)
+// lockIdx: 冲刺锁定的鸟索引(D: 迷惑效应), -1 = 未锁定
+// policy: P3 的 (1+1)-ES 策略参数(归一化 [0,1] 存储), 见 esTick()
+function makePolicy() {
+  return {
+    p: new Float64Array([norm(P_DASH_MIN), norm(P_ENERGY_LOW), norm(P_DOUBLE_TEAM),
+                         norm(P_INTERCEPT), norm(P_MOB_TOL)]),   // 当前生效参数
+    evalP: null,          // 本评估期实际在跑的参数
+    isCand: false,        // 本期跑的是候选吗
+    baseFit: -Infinity,   // 期初基准适应度(上一期的净值)
+    lastFit: 0,           // 最近一次评估期的适应度
+    t: 0,                 // 期内已跑帧数
+    gen: 0,               // 成功采纳的次数(策略代数)
+    periods: 0,
+    // 期内累加量(算适应度用)
+    score0: 0, miss: 0, metab: 0,
+  };
+}
+function norm(spec) { return (spec[2] - spec[0]) / (spec[1] - spec[0]); }
+function denorm(spec, u) { return spec[0] + clamp(u, 0, 1) * (spec[1] - spec[0]); }
+// 归一化参数 -> 实际使用值(写进复用对象, 避免每只隼每帧一个对象字面量)
+const PVV = { dashMin: 0, energyLow: 0, doubleTeam: 0, interceptAhead: 0, mobTol: 0 };
+function policyVals(f) {
+  const p = f.policy.evalP || f.policy.p;
+  PVV.dashMin = denorm(P_DASH_MIN, p[0]);
+  PVV.energyLow = denorm(P_ENERGY_LOW, p[1]);
+  PVV.doubleTeam = denorm(P_DOUBLE_TEAM, p[2]);
+  PVV.interceptAhead = denorm(P_INTERCEPT, p[3]);
+  PVV.mobTol = denorm(P_MOB_TOL, p[4]);
+  return PVV;
+}
+function makeFalcon(color, label, x, y, vx, vy, circleT) {
+  return { x, y, vx, vy, z: 140, vz: 0, targetZ: -1, color, label, kind: "falcon",
+           energy: ENERGY_MAX, dashT: 0, circleT, dashEats: 0, lockIdx: -1,
+           mob: 0, stun: 0, clashCd: 0,
+           policy: makePolicy(),
+           trailBuf: new Float32Array(TRAIL_LEN * 3), trailN: 0, trailHead: 0,   // 第 8 轮: 3D 拖尾
+           shock: null, seeing: false,
+           memX: x, memY: y, memT: -1e9, score: 0, kills: 0, pending: 0 };
+}
+/* 第 7 轮: 鹰也变成工厂 + 数组, 这样"加入鹰"按钮可以随时增援(每只鹰有自己独立的 Q 表) */
+function makeEagle(x, y, label) {
+  return { x, y, vx: 0, vy: 0, z: Z_INIT, vz: 0, targetZ: -1, kind: "eagle",
+           color: "255,190,60", label: label || "鹰 EAGLE",
+           score: 0, kills: 0, pending: 0, seeing: false,
+           dietStarling: 0, dietGoose: 0,
+           eps: EPS0, Q: new Float32Array(N_STATES * N_ACTIONS),
+           lastState: 0, lastAction: 0, curState: STATE_NONE, curAction: 2,
+           hold: 0, holdState: STATE_NONE, holdAction: 2,
+           dashT: 0, cool: 0, dashEats: 0, lockIdx: -1,
+           mob: 0, stun: 0, clashCd: 0,
+           trailBuf: new Float32Array(TRAIL_LEN * 3), trailN: 0, trailHead: 0,   // 第 8 轮: 3D 拖尾
+           shock: null,
+           memX: x, memY: y, memT: -1e9 };
+}
+const falcons = [
+  makeFalcon("235,70,70",  "隼① FALCON",   W / 2, -40,   0,  CIRCLE_SPEED, 30),
+  makeFalcon("70,150,255", "隼② FALCON-2", W / 2, H + 40, 0, -CIRCLE_SPEED, 200),
+];
+let activeId = 0;                          // 当前追猎方; 其他人设伏 + 恢复
+
+// 鹰: Q 表在线学习猎物偏好; pending 累积"本帧吃到的分", 帧末回流给 Q 更新
+// (eagles[0] 就是原来的"鹰", 面板 Q 表热力图与 SIM.Q/eps 都指向它, 保证既有契约不变)
+const eagles = [makeEagle(W * 0.7, H * 0.7, "鹰 EAGLE")];
+const eagle = eagles[0];
+
+const raptors = [...falcons, ...eagles];   // E: 猛禽之间会互攻(驱遂制)
+const threats = raptors;                   // 鸟的逃逸与被捕食判定对同一批对象生效
+
+/* ---- 第 7 轮: 随时增援猛禽(按钮"加入鹰/隼"与 SIM.addFalcon/addEagle 都走这里) ---- */
+const FALCON_COLORS = ["235,70,70", "70,150,255", "240,140,60", "180,90,230", "90,220,180", "230,120,190"];
+const CN_NUM = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
+function spawnRaptor(kind) {
+  // 在鸟群质心附近的一个固定半径环上入场(质心由 6.1/6.2 每帧更新)
+  const ang = Math.random() * TAU, r = 260 + Math.random() * 160;
+  const x = wrapX(cxmI + Math.cos(ang) * r), y = wrapY(cymI + Math.sin(ang) * r);
+  let r2;
+  if (kind === "eagle") {
+    const k = eagles.length;
+    r2 = makeEagle(x, y, "鹰" + (CN_NUM[k] || ("#" + (k + 1))) + " EAGLE");
+    eagles.push(r2);
+  } else {
+    const k = falcons.length;
+    r2 = makeFalcon(FALCON_COLORS[k % FALCON_COLORS.length],
+                    "隼" + (CN_NUM[k] || ("#" + (k + 1))) + " FALCON",
+                    x, y, 0, 0, Math.floor(Math.random() * CIRCLE_FRAMES));
+    falcons.push(r2);
+  }
+  r2.z = 120 + Math.random() * 100;        // 第 8 轮: 增援从不同高度入场
+  r2.targetZ = -1;
+  raptors.push(r2);                        // threats 与 raptors 是同一个数组对象
+  refreshRaidLine();                       // 无论从按钮还是 SIM 接口调用, 面板编制行立刻同步
+  return r2;
+}
+
+/* 第 8 轮: 一键减员(面板按钮 / Shift+F / Shift+E)。隼至少留 1 只(轮换制度需要),
+ * 鹰可以减到 0(此时面板 Q 表与鹰食谱行留空显示)。 */
+function removeRaptor(kind) {
+  if (kind === "falcon" && falcons.length > 1) {
+    const g = falcons.pop();
+    const at = raptors.indexOf(g); if (at >= 0) raptors.splice(at, 1);
+    activeId = activeId % falcons.length;
+  } else if (kind === "eagle" && eagles.length > 0) {
+    const g = eagles.pop();
+    const at = raptors.indexOf(g); if (at >= 0) raptors.splice(at, 1);
+  }
+  refreshRaidLine();
+}
+
+const stats = { steps: 0, kills: 0, wave: 0,
+                missFalcon: 0, missEagle: 0,     // A: 空冲刺惩罚次数
+                mobInterrupts: 0,                // C: 被围攻打断的冲刺次数
+                lockedDashes: 0,                 // D: 带锁定的冲刺次数
+                clashes: 0, steals: 0,           // E: 互攻/抢分次数
+                // 第 4 轮
+                dashEnds: 0, dashEndBirds: 0,    // P1: 冲刺结束时终点 80px 内的可见鸟数
+                dashMaxEats: 0,                  // P1: 单次冲刺最多吃几只椋鸟
+                dashMaxEatsLocked: 0,            // P1: 锁定冲刺(捕猎)单次最多吃几只(应 <= 1)
+                dashMaxEatsFree: 0,              // P1: 未锁定冲刺(驱逐/追雁)单次最多吃几只
+                dashEndInCone: 0,                // P2D: 冲刺终点落在威慑锥内的次数
+                dashEndApexSum: 0, dashEndApexNear: 0,   // P2D: 终点到 V 尖的距离(和 / <200px 次数)
+                apexDistSum: 0, apexDistSamples: 0, apexClose: 0,  // P2A: 雁尖与最近隼的距离采样
+                noLockAborts: 0,                 // P1: 采样到目标但 40px 内无鸟 -> 放弃冲刺
+                gooseAlerts: 0, gooseFalseAlerts: 0,  // P4: 借网预警 / 其中无猛禽在 400px 内的误报
+                gooseDisarray: 0,                // P2E: 斩首混乱次数
+                juvenileLost: 0,                 // P2C: 幼雁死亡次数
+                coneFalconFrames: 0, coneEagleDrain: 0,  // P2D: 锥内失血帧数
+                esAdopt: 0, esPeriods: 0 };      // P3: 隼策略采纳次数 / 评估期数
+let frame = 0;
+let esEvalOverride = 0;                          // 仅调试用: 缩短 ES 评估期(0 = 用 ES_EVAL_FRAMES)
+
+/* ---- 初始化 ---- */
+
+function initStarlings() {
+  alive.fill(0);
+  isMobber.fill(0);
+  startled.fill(0);
+  PV.fill(0);
+  for (let i = 0; i < N; i++) {
+    alive[i] = 1;
+    isMobber[i] = Math.random() < MOB_FRACTION ? 1 : 0;   // C: 重抽围攻者身份
+    P[2*i]   = wrapX(W / 2 + randn() * 200);
+    P[2*i+1] = wrapY(H / 2 + randn() * 200);
+    Z[i] = GRAV_ON ? Math.max(FLOOR_Z + 20, Z_INIT + randn() * Z_SPREAD) : 0;   // 第 8 轮: 初始云团高度
+    VZ[i] = (Math.random() - 0.5) * 0.6;
+    const a = Math.random() * TAU;
+    V[2*i]   = Math.cos(a) * MAX_SPEED * 0.5;
+    V[2*i+1] = Math.sin(a) * MAX_SPEED * 0.5;
+    PV[2*i]   = V[2*i];                     // P4: 上一帧速度初始化, 避免开局全体误报惊飞
+    PV[2*i+1] = V[2*i+1];
+  }
+  aliveCount = N;
+  deathT.fill(0); deathCursor = 0;
+  migAng = Math.random() * TAU;
+}
+
+/* ---- P2: 雁群的槽位几何与轮值 ------------------------------------------
+ * 槽位编号 slot(i) = (i + gooseShift) % M; 槽位 0 恒为 apex(V 尖)。
+ * 排号/左右臂由槽位索引决定, 但**幼雁的内道优先**靠"残类"实现:
+ * 幼雁是固定个体(i%4===0, 25%), 平移量按 M=60 取模, 而 4 | 60, 所以
+ * "i%4===0 的雁" 永远落在槽位残类 (gooseShift%4) 里 —— 把这一残类的槽位
+ * 排成内道(小排号), 幼雁就永远在内道, 换岗也不会换出内道。 */
+function rebuildFormation() {
+  const juvRes = ((gooseShift % 4) + 4) % 4;
+  const inner = [], outer = [];
+  for (let s = 0; s < M; s++) {
+    if (s === 0) continue;                  // 0 号槽固定是 apex
+    if (s % 4 === juvRes) inner.push(s); else outer.push(s);
+  }
+  slotRank[0] = 0; slotArm[0] = 1;
+  let rank = 1;
+  for (let k = 0; k < inner.length; k += 2) {          // 内道: 幼雁
+    slotRank[inner[k]] = rank; slotArm[inner[k]] = 1;
+    if (k + 1 < inner.length) { slotRank[inner[k + 1]] = rank; slotArm[inner[k + 1]] = -1; }
+    rank++;
+  }
+  for (let k = 0; k < outer.length; k += 2) {          // 外道: 成雁
+    slotRank[outer[k]] = rank; slotArm[outer[k]] = 1;
+    if (k + 1 < outer.length) { slotRank[outer[k + 1]] = rank; slotArm[outer[k + 1]] = -1; }
+    rank++;
+  }
+}
+
+// 雁 i 的目标槽位坐标(apex = (Lx,Ly), 航向 leaderAng)
+function gooseSlot(i) {
+  const s = (i + gooseShift) % M;
+  const rank = slotRank[s], arm = slotArm[s];
+  const back = rank * SLOT_SPACING;
+  const side = arm * rank * SLOT_SPACING * 0.36;
+  const hx = Math.cos(leaderAng), hy = Math.sin(leaderAng);
+  return { x: wrapX(Lx - hx * back - hy * side), y: wrapY(Ly - hy * back + hx * side) };
+}
+
+// 威慑锥判定(2D, perceive 打分用 —— 近似: 只看的水平面投影)
+function inCone(px, py) {
+  const dx = minImageX(px - Lx), dy = minImageY(py - Ly);
+  const d2 = dx * dx + dy * dy;
+  if (d2 > CONE_R * CONE_R) return false;
+  const d = Math.sqrt(d2) || 1;
+  return (dx / d) * Math.cos(leaderAng) + (dy / d) * Math.sin(leaderAng) > CONE_COS;
+}
+
+// 第 8 轮: 威慑锥 3D 版(失血/能耗判定用)。轴 = (领队航向, 领队垂直速度的 1/4 倾角),
+// 半角/半径不变 —— 雁抬头爬升时锥向上翘, 俯冲时向下扣。
+function inCone3(px, py, pz) {
+  const dx = minImageX(px - Lx), dy = minImageY(py - Ly), dz = GRAV_ON ? pz - Z2[leaderIdx] : 0;
+  const d2 = dx * dx + dy * dy + dz * dz;
+  if (d2 > CONE_R * CONE_R) return false;
+  const d = Math.sqrt(d2) || 1;
+  const az2 = clamp(VZ2[leaderIdx] * 0.25, -0.45, 0.45);
+  const al = Math.hypot(1, az2);
+  return (dx * Math.cos(leaderAng) + dy * Math.sin(leaderAng) + dz * az2) / (d * al) > CONE_COS;
+}
+
+// 雁 i 的死亡流程: 幼雁 -> 全体沮丧期(P2C); apex -> 斩首混乱期(P2E)。
+// 被吃与调试钩子(SIM.killGoose)共用同一条路径, 保证测试测的就是真实行为。
+function gooseDies(i) {
+  if (!galive[i]) return;
+  addDeath(P2[2*i], P2[2*i+1]);
+  galive[i] = 0; galiveCount--;
+  if (isJuvenile(i)) { gooseDebuff = JUVENILE_DEBUFF_FRAMES; stats.juvenileLost++; }
+  if (i === leaderIdx) {
+    disarray = DISARRAY_FRAMES;
+    stats.gooseDisarray++;
+    rotateLeader();                            // 先认一个新 apex, 混乱结束后按它重建
+  }
+}
+
+// 把 apex 换到下一只活雁(轮值 / 混乱后重建); 返回是否成功。
+// 不变式: slot(leaderIdx) = (leaderIdx + gooseShift) % M = 0。
+// 要把 apex 前进 k 只, 平移量必须**减** k(因为 leaderIdx = -gooseShift mod M)。
+function rotateLeader() {
+  for (let k = 1; k <= M; k++) {
+    const cand = (leaderIdx + k) % M;
+    if (galive[cand]) {
+      gooseShift = ((gooseShift - k) % M + M) % M;   // 槽位序号平移
+      leaderIdx = cand;
+      rebuildFormation();
+      return true;
+    }
+  }
+  return false;
+}
+
+function initGeese() {
+  galive.fill(1); galiveCount = M;
+  leaderAng = Math.random() * TAU;
+  Lx = wrapX(W * 0.3); Ly = wrapY(H * 0.3);
+  gooseShift = 0; leaderIdx = 0; disarray = 0; gooseDebuff = 0;
+  juvCount = 0;
+  for (let i = 0; i < M; i++) if (isJuvenile(i)) juvCount++;
+  rebuildFormation();
+  for (let i = 0; i < M; i++) { Z2[i] = Z_INIT + 34 + (i % 5) * 5; VZ2[i] = 0; }   // 第 8 轮: 雁在稍高的稳定层
+  const hx = Math.cos(leaderAng), hy = Math.sin(leaderAng);
+  for (let i = 0; i < M; i++) {
+    const s = gooseSlot(i);
+    P2[2*i] = s.x; P2[2*i+1] = s.y;
+    V2[2*i] = hx * LEADER_SPEED; V2[2*i+1] = hy * LEADER_SPEED;
+  }
+  Lx = P2[2*leaderIdx]; Ly = P2[2*leaderIdx+1];   // 虚拟领队 = apex 雁当前位置
+}
+
+function resetFlocks() { initStarlings(); initGeese(); }
+
+// 猛禽回到起始状态(位置/能量/记忆/拖尾), 计分保留。
+// 第 7 轮: "重置猛禽"同时把增援解散 —— 回到默认编制(2 隼 + 1 鹰), 这样按钮可逆。
+function resetPredators() {
+  const inOpen = !TORUS;
+  // 解散增援: 只保留 falcons[0..1] 与 eagles[0], 并从 raptors 里摘掉多余的
+  while (falcons.length > 2) { const gone = falcons.pop(); const at = raptors.indexOf(gone); if (at >= 0) raptors.splice(at, 1); }
+  while (eagles.length > 1)  { const gone = eagles.pop();  const at = raptors.indexOf(gone); if (at >= 0) raptors.splice(at, 1); }
+  const f0 = falcons[0], f1 = falcons[1];
+  f0.x = W / 2; f0.y = inOpen ? -40 : H * 0.15; f0.vx = 0; f0.vy = CIRCLE_SPEED; f0.circleT = 30;
+  f1.x = W / 2; f1.y = inOpen ? H + 40 : H * 0.85; f1.vx = 0; f1.vy = -CIRCLE_SPEED; f1.circleT = 200;
+  for (const f of falcons) {
+    f.energy = ENERGY_MAX; f.dashT = 0; f.trailN = 0; f.trailHead = 0; f.shock = null;
+    f.memX = W / 2; f.memY = H / 2; f.memT = -1e9; f.seeing = false;
+    f.dashEats = 0; f.lockIdx = -1; f.mob = 0; f.stun = 0; f.clashCd = 0;
+    f.z = 140; f.vz = 0; f.targetZ = -1;                              // 第 8 轮
+  }
+  activeId = 0;
+  for (let i = 0; i < eagles.length; i++) {
+    const E = eagles[i];
+    E.x = W * 0.7; E.y = H * 0.7; E.vx = 0; E.vy = 0;
+    E.dashT = 0; E.cool = 0; E.trailN = 0; E.trailHead = 0; E.shock = null;
+    E.memX = W * 0.5; E.memY = H * 0.5; E.memT = -1e9; E.seeing = false;
+    E.lastState = 0; E.lastAction = 0; E.pending = 0;
+    E.dashEats = 0; E.lockIdx = -1; E.mob = 0; E.stun = 0; E.clashCd = 0;
+    E.hold = 0; E.holdState = STATE_NONE; E.holdAction = 2;
+    E.z = Z_INIT; E.vz = 0; E.targetZ = -1;                           // 第 8 轮
+  }
+}
+
+// 几何切换: 改世界尺寸 + 重置位置(否则鸟会落在新的墙外)
+function setGeometry(torus) {
+  TORUS = !!torus;
+  PAD = TORUS ? 0 : PAD_OPEN;
+  recomputeGridSize();
+  resetFlocks();
+  resetPredators();
+}
+
+function setN(v) {
+  N = clamp(Math.round(v), 100, MAXN);
+  initStarlings();
+}
+
+/* --------------------- 4. 自动补充猎物 --------------------- */
+
+// 四个补充方向(常量, 避免每次补充时新建对象字面量数组)
+const REFILL_SIDES = [
+  { x: -PAD - 20, y: H / 2, inx: 1, iny: 0 },
+  { x: W + PAD + 20, y: H / 2, inx: -1, iny: 0 },
+  { x: W / 2, y: -PAD - 20, inx: 0, iny: 1 },
+  { x: W / 2, y: H + PAD + 20, inx: 0, iny: -1 },
+];
+
+// 死亡太多时, 从离猛禽最远的一侧补一波: 让竞赛能长时间看下去。
+// 两趟扫描(先挑边, 再就地安置), 不再收集 dead 索引数组。
+function refillStarlings() {
+  let deadCount = 0;
+  for (let i = 0; i < N; i++) if (!alive[i]) deadCount++;
+  if (deadCount === 0) return;
+
+  let best = REFILL_SIDES[0], bestD = -1;
+  for (let s = 0; s < REFILL_SIDES.length; s++) {
+    const sd = REFILL_SIDES[s];
+    let dmin = 1e18;
+    for (const f of threats) {
+      const dx = minImageX(sd.x - f.x), dy = minImageY(sd.y - f.y);
+      dmin = Math.min(dmin, dx * dx + dy * dy);
+    }
+    if (dmin > bestD) { bestD = dmin; best = sd; }
+  }
+
+  for (let i = 0; i < N; i++) {
+    if (alive[i]) continue;
+    const jx = best.inx !== 0 ? randn() * 25 : randn() * 200;
+    const jy = best.iny !== 0 ? randn() * 25 : randn() * 200;
+    P[2*i]   = wrapX(best.x + jx);
+    P[2*i+1] = wrapY(best.y + jy);
+    const vx = best.inx * MAX_SPEED * 0.6 + (Math.random() - 0.5) * 0.6;
+    const vy = best.iny * MAX_SPEED * 0.6 + (Math.random() - 0.5) * 0.6;
+    const vs = Math.hypot(vx, vy) || 1;
+    V[2*i]   = vx / vs * MAX_SPEED * 0.6;
+    V[2*i+1] = vy / vs * MAX_SPEED * 0.6;
+    PV[2*i] = V[2*i]; PV[2*i+1] = V[2*i+1];
+    startled[i] = 0;
+    alive[i] = 1;
+  }
+  aliveCount += deadCount;
+  stats.wave++;
+}
+
+function refillGeese() {
+  const hx = Math.cos(leaderAng), hy = Math.sin(leaderAng);
+  let added = 0;
+  for (let i = 0; i < M; i++) {
+    if (galive[i]) continue;
+    const s = gooseSlot(i);
+    P2[2*i] = s.x; P2[2*i+1] = s.y;
+    V2[2*i] = hx * LEADER_SPEED; V2[2*i+1] = hy * LEADER_SPEED;
+    galive[i] = 1; added++;
+  }
+  galiveCount += added;
+}
+
+function maybeRefill() {
+  if (!refillOn) return;
+  if (aliveCount < N * REFILL_RATIO) refillStarlings();
+  if (galiveCount < M * REFILL_G_RATIO) refillGeese();
+}
+
+/* --------------------- 5. 猛禽感知与采样目标获取(无全局视野) --------------------- */
+
+// 采样目标获取(P1)用的预计算量与复用缓冲
+const CANDX = new Float64Array(N_CAND), CANDY = new Float64Array(N_CAND);
+const CAND_R = new Float64Array(N_CAND);
+for (let r = 0, k = 0; r < SAMPLE_RADII.length; r++) {
+  for (let a = 0; a < SAMPLE_ANGLES; a++, k++) {
+    const ang = a / SAMPLE_ANGLES * TAU;
+    CANDX[k] = Math.cos(ang) * SAMPLE_RADII[r];
+    CANDY[k] = Math.sin(ang) * SAMPLE_RADII[r];
+    CAND_R[k] = SAMPLE_RADII[r];
+  }
+}
+const candScore = new Float64Array(N_CAND);
+const VIS = new Int32Array(MAXN);          // 视野内可见椋鸟索引(复用)
+const ANG_BIN = TAU / SAMPLE_ANGLES;       // 每个候选角度占的弧度
+// 每个环的"角度窗"半宽(单位: 角度槽数), 取 bd=ring 时的最坏情况:
+//   Δθ_max = 2·asin(SCOOP_R / (2·ring)), 槽数 = ceil(Δθ_max / ANG_BIN)
+// 这样内层循环里不用再做 asin/sqrt, 只需 1 次 atan2(每只鸟)+ 若干平方比较。
+const CAND_W = new Int32Array(SAMPLE_RADII.length);
+const CAND_LO2 = new Float64Array(SAMPLE_RADII.length), CAND_HI2 = new Float64Array(SAMPLE_RADII.length);
+for (let r = 0; r < SAMPLE_RADII.length; r++) {
+  const rad = SAMPLE_RADII[r];
+  const half = 2 * Math.asin(Math.min(1, SCOOP_R / (2 * rad)));
+  CAND_W[r] = Math.min(Math.max(1, Math.ceil(half / ANG_BIN)), SAMPLE_ANGLES >> 1);
+  const lo = Math.max(0, rad - SCOOP_R), hi = rad + SCOOP_R;
+  CAND_LO2[r] = lo * lo; CAND_HI2[r] = hi * hi;
+}
+
+// perceive: 视野内的椋鸟统计 + 采样目标获取。
+//   1) 沿用桶心粗筛 + 逐只精确判距, 收集全部可见椋鸟(质心 x,y / 数量 n 照旧);
+//   2) 每只鸟累加进"距离 < SCOOP_R 的所有候选点"(80 个极坐标候选), 得到
+//      "哪个位置一小勺能捞到最多鸟";
+//   3) 打分 = 捞到的鸟数 ×(1 + DIR_LAG·cos(候选方向, 当前航向)) —— 方向滞后防抖动;
+//      // 扩展位: 雁权重 / 威慑锥扣分 / mob 扣分 都可以在这里乘上 (P2D 已接锥)
+//   4) argmax 候选点 = 冲刺中心 (cx,cy); lockIdx = 中心 LOCK_R 内最近的鸟,
+//      40px 内没鸟则视为"目标不可用"(caller 会放弃这次冲刺)。
+// bi 语义改为"中心附近那只代表鸟"(= lockIdx), 供伏击按它的速度外推。
+// 复用的返回对象(每帧被猛禽调用 3 次 + 冲刺收尾 1 次): 不再每次分配对象字面量
+const PC = { x: 0, y: 0, n: 0, bi: -1, cx: -1, cy: -1, lockIdx: -1, score: 0, z: Z_INIT };
+
+function perceive(px, py, vx, vy, viewR2) {
+  const cellR = Math.sqrt(viewR2) + CELL * 0.75, cellR2 = cellR * cellR;
+  const maxCandR = Math.sqrt(viewR2) - SCOOP_R;     // 捞勺伸出视野的候选点直接不要
+  let cnt = 0, nVis = 0;
+  let sumX = 0, sumY = 0, sumZ = 0, scx = 0, ssx = 0, scy = 0, ssy = 0;   // 第 8 轮: sumZ
+  candScore.fill(0);
+
+  // 按"桶首次出现顺序"遍历(位级等价于旧版的 Map.forEach), 桶内逆链成升序
+  for (let oi = 0; oi < cellOrderN; oi++) {
+    const c = cellOrder[oi];
+    const cx = c % GW, cy = (c / GW) | 0;
+    const bx = -PAD + (cx + 0.5) * CELL, by = -PAD + (cy + 0.5) * CELL;
+    const dx = minImageX(bx - px), dy = minImageY(by - py);
+    if (dx * dx + dy * dy > cellR2) continue;
+    let m = 0;
+    for (let j = gridHead[c]; j !== -1; j = gridNext[j]) chainBuf[m++] = j;   // 降序收集
+    for (let q = m - 1; q >= 0; q--) {                                        // 升序遍历
+      const j = chainBuf[q];
+      const ex = minImageX(P[2*j] - px), ey = minImageY(P[2*j+1] - py);
+      const d2 = ex * ex + ey * ey;
+      if (d2 > viewR2) continue;
+      cnt++;
+      if (nVis < MAXN) VIS[nVis++] = j;
+      if (TORUS) {
+        const ta = P[2*j] / W * TAU, tb = P[2*j+1] / H * TAU;
+        scx += Math.cos(ta); ssx += Math.sin(ta);
+        scy += Math.cos(tb); ssy += Math.sin(tb);
+      } else { sumX += P[2*j]; sumY += P[2*j+1]; sumZ += Z[j]; }   // 第 8 轮
+
+      // 这只鸟能被哪些候选点"捞"到? 两层预筛把 80 个候选砍到 5~10 个:
+      //   1) 半径: |ring - bd| < SCOOP_R(用平方比较, 不 sqrt);
+      //   2) 角度: 只试最近角度槽 ±CAND_W[ring] 个(最坏情况窗, 预计算)。
+      const bang = Math.atan2(ey, ex);
+      const c0 = Math.round(bang / ANG_BIN);
+      for (let r = 0, k = 0; r < SAMPLE_RADII.length; r++, k += SAMPLE_ANGLES) {
+        if (SAMPLE_RADII[r] > maxCandR || d2 < CAND_LO2[r] || d2 > CAND_HI2[r]) continue;
+        const w = CAND_W[r];
+        for (let o = -w; o <= w; o++) {
+          let ai = (c0 + o) % SAMPLE_ANGLES; if (ai < 0) ai += SAMPLE_ANGLES;
+          const kk = k + ai;
+          const ddx = ex - CANDX[kk], ddy = ey - CANDY[kk];
+          if (ddx * ddx + ddy * ddy < SCOOP_R2) candScore[kk] += 1;
+        }
+      }
+    }
+  }
+
+  if (cnt === 0) return null;
+  const mx = TORUS ? wrapX(Math.atan2(ssx, scx) / TAU * W) : sumX / cnt;
+  const my = TORUS ? wrapY(Math.atan2(ssy, scy) / TAU * H) : sumY / cnt;
+
+  // 打分: 方向滞后 + 威慑锥乘项(P2D: 让选目标自己绕开雁群正面, 不写躲避硬编码)
+  const sp = Math.sqrt(vx * vx + vy * vy) || 1;
+  const ux = vx / sp, uy = vy / sp;
+  const coneOn = galiveCount > 0;
+  let bestS = 0, bestK = -1;
+  for (let k = 0; k < N_CAND; k++) {
+    const base = candScore[k];
+    if (base <= 0 || CAND_R[k] > maxCandR) continue;
+    const d = CAND_R[k] || 1;
+    let sc = base * (1 + DIR_LAG * ((CANDX[k] / d) * ux + (CANDY[k] / d) * uy));
+    // 扩展位: 雁权重 / 威慑锥扣分 / mob 扣分
+    if (coneOn && inCone(px + CANDX[k], py + CANDY[k])) sc *= CONE_SCORE_FACTOR;
+    if (sc > bestS) { bestS = sc; bestK = k; }
+  }
+
+  let cxT = -1, cyT = -1, lockIdx = -1;
+  if (bestK >= 0) {
+    cxT = px + CANDX[bestK]; cyT = py + CANDY[bestK];
+    let bestD = LOCK_R2;                     // 中心附近最近的鸟: 冲刺途中只吃它
+    for (let v = 0; v < nVis; v++) {
+      const j = VIS[v];
+      const dx = minImageX(P[2*j] - cxT), dy = minImageY(P[2*j+1] - cyT);
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD) { bestD = d2; lockIdx = j; }
+    }
+    if (lockIdx < 0) { cxT = -1; cyT = -1; } // 40px 内无鸟 -> 本次放弃
+  }
+  PC.x = mx; PC.y = my; PC.n = cnt; PC.bi = lockIdx;
+  PC.cx = cxT; PC.cy = cyT; PC.lockIdx = lockIdx; PC.score = bestS;
+  PC.z = cnt ? sumZ / cnt : Z_INIT;          // 第 8 轮: 视野内鸟群的平均高度(猛禽的目标高度)
+  return PC;
+}
+
+// tryDash: 发起冲刺。带 ±60° 方向约束 —— 目标必须在当前航向 60° 以内,
+// 否则放弃并返回 false(盘旋转向会逐渐对齐, 这是特性不是 bug)。
+// lockIdx: D 的迷惑效应 —— 冲刺锁定的椋鸟索引(雁/对手传 -1, 不算锁定)。
+function tryDash(f, tx, ty, lockIdx, tz) {       // 第 8 轮: 升维成 3D(重力版航向夹角)
+  const dx = minImageX(tx - f.x), dy = minImageY(ty - f.y);
+  const dz = (tz === undefined ? f.z : tz) - f.z;   // 旧调用不传 tz -> dz=0 -> 2D 语义
+  const n = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (n <= 1) return false;
+  const cvx = f.vx, cvy = f.vy, cvz = GRAV_ON ? f.vz : 0;
+  const cn = Math.sqrt(cvx * cvx + cvy * cvy + cvz * cvz) || 1;
+  const cosA = (cvx * dx + cvy * dy + cvz * dz) / (cn * n);
+  if (cosA < Math.cos(DASH_MAX_ANGLE)) return false;   // 等价于 2D 的 ±60° 判定
+  f.vx = dx / n * DASH_SPEED;
+  f.vy = dy / n * DASH_SPEED;
+  f.vz = dz / n * DASH_SPEED;
+  f.dashT = Math.floor((Math.min(n, DASH_MAX_DIST) + DASH_EXTRA) / DASH_SPEED);
+  f.shock = { x: tx, y: ty, z: f.z, t: 0 };      // 冲刺瞬间的冲击波(带高度)
+  f.dashEats = 0;                                // A: 本次冲刺的猎物计数清零
+  f.dashS = 0;                                   // P1: 本次冲刺吃到的椋鸟数(验收用)
+  f.lockIdx = (DASH_LOCK && lockIdx !== undefined) ? lockIdx : -1;
+  if (f.lockIdx >= 0) stats.lockedDashes++;
+  return true;
+}
+
+/* ------------------------------ 6. 仿真 step ------------------------------ */
+
+let migAng = Math.random() * TAU;          // 群体迁徙方向(缓慢随机游动)
+
+/* step():
+ *   6.1+6.2 网格与拓扑邻居(可选 GPU —— 见文件末尾 WebGPU 计算后端)
+ *   + 6.3~6.10 其余系统(永久留 CPU: 雁/猛禽/学习/事件)
+ * CPU 路径与旧版逐行同构(位级一致, 见 _checks/golden.mjs)。 */
+let cxmI = W / 2, cymI = H / 2;              // 6.1/6.2 产出的全局质心, 供 6.3/6.4 用
+function step() {
+  frame++; stats.steps++;
+  const tor = TORUS;                         // 每步取一次, 热循环里不再反复查全局
+  cpuGridAndForces(tor);                     // 6.1 + 6.2(CPU 参考实现)
+  stepRest(tor);                             // 6.3 ~ 6.10
+}
+
+/* ---- 6.1 + 6.2(CPU 参考实现; GPU 版见文末 ComputeBackend 的同构 WGSL) ---- */
+function cpuGridAndForces(tor) {
+  /* ---- 6.1 重建网格(只装活椋鸟; 链表池化, 零分配) ----
+   * 链表是头插法(桶内降序), 但**遍历顺序必须与旧版逐位一致**, 否则浮点求和
+   * 顺序变了、混沌系统会放大成完全不同的轨迹: 所以额外记住"桶的首次出现顺序"
+   * (cellOrder)并在遍历时把链逆成升序(chainBuf) —— 位级复现旧 Map+数组的行为。 */
+  gridHead.fill(-1);
+  cellOrderN = 0;
+  for (let i = 0; i < N; i++) {
+    if (!alive[i]) continue;
+    const c = cellOf(P[2*i], P[2*i+1]);
+    if (gridHead[c] === -1) cellOrder[cellOrderN++] = c;
+    gridNext[i] = gridHead[c];               // 头插法: i 成为该桶新的链头
+    gridHead[c] = i;
+  }
+  for (const f of threats) f.mob = 0;        // C: 围攻计数每帧清零, 本帧重新统计
+
+  /* ---- 6.2 椋鸟: 拓扑邻居扫描(只算力) + 全局质心累加 ---- */
+  let sumX = 0, sumY = 0, cntAlive = 0;
+  let sXc = 0, cXc = 0, sYc = 0, cYc = 0;
+
+  for (let i = 0; i < N; i++) {
+    if (!alive[i]) continue;
+    const xi = P[2*i], yi = P[2*i+1];
+    const cx = clamp(Math.floor((xi + PAD) / CELL), 0, GW - 1);
+    const cy = clamp(Math.floor((yi + PAD) / CELL), 0, GH - 1);
+
+    // 收集候选, 只保留最近的 topoK 只(拓扑邻居; A 版的核心)。
+    // 槽位按距离升序维护: 比"每次重扫最远槽"少一个 O(K) 内层循环,
+    // 大多数候选只需一次比较 KD[kn-1] 就被丢掉。
+    let kn = 0;
+    for (let ox = -1; ox <= 1; ox++)
+      for (let oy = -1; oy <= 1; oy++) {
+        let gx = cx + ox, gy = cy + oy;
+        if (tor) { gx = ((gx % GW) + GW) % GW; gy = ((gy % GH) + GH) % GH; }
+        else if (gx < 0 || gx >= GW || gy < 0 || gy >= GH) continue;
+        for (let j = gridHead[gy * GW + gx]; j !== -1; j = gridNext[j]) {
+          if (j === i) continue;
+          const dx = tor ? minImageX(P[2*j] - xi) : P[2*j] - xi;
+          const dy = tor ? minImageY(P[2*j+1] - yi) : P[2*j+1] - yi;
+          const d2 = dx * dx + dy * dy;
+          if (d2 > PERCEPTION_R2) continue;
+          let p;
+          if (kn < topoK) p = kn++;            // 先填满 K 个槽
+          else if (d2 < KD[kn-1]) p = kn - 1;  // 比当前最远的还近 -> 顶掉它
+          else continue;
+          while (p > 0 && KD[p-1] > d2) {      // 冒泡到正确位置, 维持升序
+            KD[p] = KD[p-1]; KX[p] = KX[p-1]; KY[p] = KY[p-1]; KJ[p] = KJ[p-1];
+            p--;
+          }
+          KD[p] = d2; KX[p] = dx; KY[p] = dy; KJ[p] = j;
+        }
+      }
+
+    let ax = 0, ay = 0;
+    if (kn > 0) {
+      let psx = 0, psy = 0, vsx = 0, vsy = 0, sepx = 0, sepy = 0;
+      for (let m = 0; m < kn; m++) {
+        psx += KX[m]; psy += KY[m];
+        vsx += V[2*KJ[m]]; vsy += V[2*KJ[m]+1];
+        if (KD[m] < SEP_R2) {                  // 距离加权分离: 越近推得越狠
+          const w = 1 / Math.max(KD[m], 1);
+          sepx -= KX[m] * w; sepy -= KY[m] * w;
+        }
+      }
+      const mx = COHESION_W * psx / kn + ALIGNMENT_W * vsx / kn;
+      const my = COHESION_W * psy / kn + ALIGNMENT_W * vsy / kn;
+      const nn = Math.hypot(mx, my);
+      if (nn > 1e-9) {
+        ax += clamp(mx / nn * MAX_SPEED - V[2*i],   -MAX_FORCE, MAX_FORCE);
+        ay += clamp(my / nn * MAX_SPEED - V[2*i+1], -MAX_FORCE, MAX_FORCE);
+      }
+      ax += clamp(sepx * SEP_GAIN, -2 * MAX_FORCE, 2 * MAX_FORCE);
+      ay += clamp(sepy * SEP_GAIN, -2 * MAX_FORCE, 2 * MAX_FORCE);
+    }
+    ACC[2*i] = ax; ACC[2*i+1] = ay;
+
+    sumX += xi; sumY += yi; cntAlive++;
+    if (tor) {                                 // 环面质心走圆均值
+      sXc += Math.sin(xi / W * TAU); cXc += Math.cos(xi / W * TAU);
+      sYc += Math.sin(yi / H * TAU); cYc += Math.cos(yi / H * TAU);
+    }
+  }
+
+  cxmI = cntAlive === 0 ? W / 2
+       : (tor ? wrapX(Math.atan2(sXc, cXc) / TAU * W) : sumX / cntAlive);
+  cymI = cntAlive === 0 ? H / 2
+       : (tor ? wrapY(Math.atan2(sYc, cYc) / TAU * H) : sumY / cntAlive);
+}
+
+/* ---- 只算全局质心(GPU 路径下 6.1/6.2 在 GPU 上跑, 但 6.3/6.4 仍需要质心) ----
+ * 与 cpuGridAndForces 里那段累加完全同序(逐鸟 i 升序), 所以结果逐位一致。 */
+function cpuCentroidOnly(tor) {
+  let sumX = 0, sumY = 0, cnt = 0, sXc = 0, cXc = 0, sYc = 0, cYc = 0;
+  for (let i = 0; i < N; i++) {
+    if (!alive[i]) continue;
+    const xi = P[2*i], yi = P[2*i+1];
+    sumX += xi; sumY += yi; cnt++;
+    if (tor) {
+      sXc += Math.sin(xi / W * TAU); cXc += Math.cos(xi / W * TAU);
+      sYc += Math.sin(yi / H * TAU); cYc += Math.cos(yi / H * TAU);
+    }
+  }
+  cxmI = cnt === 0 ? W / 2 : (tor ? wrapX(Math.atan2(sXc, cXc) / TAU * W) : sumX / cnt);
+  cymI = cnt === 0 ? H / 2 : (tor ? wrapY(Math.atan2(sYc, cYc) / TAU * H) : sumY / cnt);
+}
+
+/* ---- 6.3 ~ 6.10(永久留 CPU) ---- */
+function stepRest(tor) {
+  /* 第 8 轮: 群体均高(定高弹簧用, O(N) 一遍过; 与 xy 完全解耦 -> 2D 轨迹逐位不变) */
+  let zSum = 0, zCnt = 0;
+  for (let i = 0; i < N; i++) if (alive[i]) { zSum += Z[i]; zCnt++; }
+  const zMean = zCnt ? zSum / zCnt : Z_INIT;
+  zMeanLive = zMean;
+
+  /* ---- 6.3 迁徙方向: 随机游动 + 离屏太远就掰回来 ---- */
+  migAng += (Math.random() - 0.5) * 0.025;
+  const offX = tor ? minImageX(W / 2 - cxmI) : W / 2 - cxmI;
+  const offY = tor ? minImageY(H / 2 - cymI) : H / 2 - cymI;
+  if (Math.sqrt(offX * offX + offY * offY) > 150) {
+    migAng += angDiff(Math.atan2(offY, offX), migAng) * 0.02;
+  }
+  const migX = Math.cos(migAng) * MIGRATE_FORCE;
+  const migY = Math.sin(migAng) * MIGRATE_FORCE;
+
+  /* ---- 6.4 椋鸟: 积分(质心引力 + 迁徙 + 边界 + 被捕食 + 逃逸) ---- */
+  for (let i = 0; i < N; i++) {
+    if (!alive[i]) continue;
+    const xi = P[2*i], yi = P[2*i+1];
+    const vi = 2 * i;
+    let ax = ACC[vi], ay = ACC[vi+1];
+    let az = 0;                            // 第 8 轮: 垂直方向力(逃逸/弹簧/重力)
+
+    const dcx = tor ? minImageX(cxmI - xi) : cxmI - xi;
+    const dcy = tor ? minImageY(cymI - yi) : cymI - yi;
+    const dn = Math.sqrt(dcx * dcx + dcy * dcy);   // 弱质心引力, 只防永久碎裂
+    if (dn > 1e-9) { ax += dcx / dn * CENTROID_FORCE; ay += dcy / dn * CENTROID_FORCE; }
+
+    ax += migX; ay += migY;
+
+    if (!tor) {                                // 开阔世界的柔性边界
+      if (xi < -PAD) ax += BOUND_FORCE;
+      else if (xi > W + PAD) ax -= BOUND_FORCE;
+      if (yi < -PAD) ay += BOUND_FORCE;
+      else if (yi > H + PAD) ay -= BOUND_FORCE;
+    }
+
+    let eaten = false;                         // 被捕食: 撞上任意猛禽即消失
+    for (let t = 0; t < threats.length; t++) {
+      const f = threats[t];
+      // D 迷惑效应: 冲刺锁定某只鸟时, 冲刺期间只吃得到被锁定的那一只
+      if (f.dashT > 0 && f.lockIdx >= 0 && f.lockIdx !== i) continue;
+      const ex = tor ? minImageX(xi - f.x) : xi - f.x;
+      const ey = tor ? minImageY(yi - f.y) : yi - f.y;
+      const ez = GRAV_ON ? Z[i] - f.z : 0;                  // 第 8 轮: 3D 判定球
+      if (ex * ex + ey * ey + ez * ez < EAT_R2_S) {
+        f.score += SCORE_STARLING; f.pending += SCORE_STARLING; f.kills++;
+        if (f.dashT > 0) { f.dashEats++; f.dashS++; }   // A: 吃到东西 / P1 验收只数椋鸟
+        if (f.kind === "eagle") f.dietStarling++;
+        stats.kills++;
+        alive[i] = 0; aliveCount--;
+        addDeath(xi, yi);
+        if (GRAV_ON) spawnCorpse(xi, yi, Z[i], V[vi], V[vi+1], VZ[i]);   // 第 8 轮: 尸体下坠
+        eaten = true;
+        break;
+      }
+    }
+    if (eaten) continue;
+
+    for (let t = 0; t < threats.length; t++) {  // 逃逸: 视野内所有猛禽都生效
+      const f = threats[t];
+      const dpx = tor ? minImageX(xi - f.x) : xi - f.x;
+      const dpy = tor ? minImageY(yi - f.y) : yi - f.y;
+      const dp2 = dpx * dpx + dpy * dpy;
+      if (dp2 < FLEE_R2 && dp2 > 0) {
+        const dp = Math.sqrt(dp2);
+        ax += FLEE_W * clamp(dpx / dp * MAX_SPEED - V[vi],   -FLEE_FORCE, FLEE_FORCE);
+        ay += FLEE_W * clamp(dpy / dp * MAX_SPEED - V[vi+1], -FLEE_FORCE, FLEE_FORCE);
+        if (GRAV_ON) {                       // 第 8 轮: 三维逃逸 —— 高于猛禽往上飞, 低于往下钻
+          const dz2 = Z[i] - f.z;
+          az += clamp(-dz2 / dp * 1.6 - VZ[i], -0.35, 0.35);
+        }
+      }
+    }
+
+    // C 围攻: 围攻者逼近猛禽到骚扰环 —— 环外往里压, 环内往外推, 鸟群围着猛禽转
+    if (isMobber[i]) {
+      let mf = null, md2 = 1e18, mdx = 0, mdy = 0;
+      for (let t = 0; t < threats.length; t++) {
+        const f = threats[t];
+        const dx = tor ? minImageX(xi - f.x) : xi - f.x;
+        const dy = tor ? minImageY(yi - f.y) : yi - f.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < md2) { md2 = d2; mf = f; mdx = dx; mdy = dy; }
+      }
+      const md = Math.sqrt(md2);
+      if (mf && md < MOB_R && md > 1e-6) {
+        mf.mob++;                              // 本帧被这只鸟围住
+        const ux = mdx / md, uy = mdy / md;    // u = "猛禽指向鸟"的单位向量
+        const push = (md - MOB_HARASS) / MOB_HARASS;
+        const tx2 = -ux * push * MAX_SPEED * 1.5;
+        const ty2 = -uy * push * MAX_SPEED * 1.5;
+        ax += clamp(tx2 - V[vi],   -MOB_MAX, MOB_MAX);
+        ay += clamp(ty2 - V[vi+1], -MOB_MAX, MOB_MAX);
+      }
+    }
+
+    let vx = V[vi] + ax, vy = V[vi+1] + ay;
+    const sp = Math.sqrt(vx * vx + vy * vy);
+    if (sp > MAX_SPEED) { vx = vx / sp * MAX_SPEED; vy = vy / sp * MAX_SPEED; }
+    V[vi] = vx; V[vi+1] = vy;
+    P[vi]   = wrapX(xi + vx);
+    P[vi+1] = wrapY(yi + vy);
+
+    // 第 8 轮 z 轴: 重力 - 定高弹簧(朝群体均高) + 近地推升 + 逃逸垂直分量。
+    // xy 动力学不受影响 -> 重力关掉时与旧版逐位一致。
+    if (GRAV_ON) {
+      let az2 = az - G_GRAV + (zMean - Z[i]) * ALT_SPRING;
+      if (Z[i] < FLOOR_Z + 50) az2 += FLOOR_PUSH;
+      VZ[i] = clamp(VZ[i] + az2, -3.2, 3.2);
+      Z[i] = Math.max(FLOOR_Z, Z[i] + VZ[i]);
+    }
+
+    // P4 惊飞判据: **必须放在这里** —— 位置/速度已经更新, 还没覆盖 PV。
+    // 判据是"相邻两帧速度夹角 > 60°"(急转, 不是快慢: 椋鸟平时也贴满速)。
+    // 顺序错一帧(先覆盖 PV 再比)会让全体互相拿自己比, 全员误报。
+    const pvx = PV[vi], pvy = PV[vi+1];
+    const np = Math.sqrt(pvx * pvx + pvy * pvy);
+    if (np > 1e-6 && sp > 1e-6) {
+      startled[i] = ((vx * pvx + vy * pvy) / (sp * np) < PV_ALERT_COS) ? 1 : 0;
+    } else startled[i] = 0;
+    PV[vi] = vx; PV[vi+1] = vy;
+  }
+
+  stepCorpses();                             // 第 8 轮: 尸体下坠(与鸟/雁无关, O(常量))
+
+  /* ---- 6.5 雁群: 中心化秩序(领队智能 / 轮值 / 幼雁内道 / 威慑锥 / 斩首混乱)
+   *   + 第四部分: 借椋鸟群的惊飞网提前预警 ---- */
+
+  // --- 轮值领队: 每 ROTATE_FRAMES 换一次 apex; 虚拟领队位置 = apex 雁当前位置(不瞬移)
+  if (frame % ROTATE_FRAMES === 0) rotateLeader();
+  if (disarray > 0) disarray--;
+  if (gooseDebuff > 0) gooseDebuff--;
+  Lx = P2[2*leaderIdx]; Ly = P2[2*leaderIdx+1];       // apex 自己就是 V 尖
+
+  // --- 领队智能(A): 感知 400px 内最近猛禽 -> 限速转向远离; 无威胁时随机游动 + 向心
+  let leaderHustle = 1;
+  {
+    let ld = 1e18, lx = 0, ly = 0;
+    for (let t = 0; t < threats.length; t++) {
+      const f = threats[t];
+      const dx = minImageX(Lx - f.x), dy = minImageY(Ly - f.y);
+      const d2 = dx * dx + dy * dy;
+      if (d2 < ld) { ld = d2; lx = dx; ly = dy; }
+    }
+    const ld2 = Math.sqrt(ld);
+    if (ld2 < LEADER_SENSE_R && ld2 > 1e-6) {
+      const away = Math.atan2(ly, lx);                 // 远离猛禽的方向
+      leaderAng += clamp(angDiff(away, leaderAng), -LEADER_MAX_TURN, LEADER_MAX_TURN);
+    } else {
+      leaderAng += (Math.random() - 0.5) * 0.02;       // 随机游动
+      const ox = minImageX(W / 2 - Lx), oy = minImageY(H / 2 - Ly);
+      if (Math.hypot(ox, oy) > 300) leaderAng += angDiff(Math.atan2(oy, ox), leaderAng) * 0.015;
+    }
+    // 威胁很近了: 领队带头加速(队形不变, 只是整体提速)
+    if (ld2 < LEADER_PANIC_R) leaderHustle = ESCAPE_HUSTLE;
+  }
+  const lhx = Math.cos(leaderAng), lhy = Math.sin(leaderAng);
+  const slotScale = (gooseDebuff > 0 ? DEBUFF_FACTOR : 1);
+
+  // P2A 验收取样(每 30 帧): 雁尖与最近隼的距离 —— 领队智能有没有把队形带开
+  if (frame % 30 === 0 && galiveCount > 0) {
+    let bd = 1e18;
+    for (const f of falcons) {
+      const dx = minImageX(Lx - f.x), dy = minImageY(Ly - f.y);
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bd) bd = d2;
+    }
+    bd = Math.sqrt(bd);
+    stats.apexDistSum += bd; stats.apexDistSamples++;
+    if (bd < 300) stats.apexClose++;
+  }
+
+  for (let i = 0; i < M; i++) {
+    if (!galive[i]) continue;
+    const xi = P2[2*i], yi = P2[2*i+1];
+
+    let nd = 1e18, nx = 0, ny = 0, nz = 0;     // 最近的猛禽(含鹰)
+    for (const f of threats) {
+      const dx = minImageX(xi - f.x), dy = minImageY(yi - f.y);
+      const d2 = dx * dx + dy * dy;
+      if (d2 < nd) { nd = d2; nx = dx; ny = dy; nz = GRAV_ON ? f.z : 0; }
+    }
+    const d = Math.sqrt(nd);
+    const raptorNear = d < FORMATION_BREAK && d > 0;
+    const gooseFleeZ = () => {                 // 第 8 轮: 三维逃逸的垂直分量(混乱/让位两处复用)
+      if (GRAV_ON) VZ2[i] += clamp((Z2[i] - nz) / Math.max(1, d) * 1.5 - VZ2[i], -0.25, 0.25);
+    };
+
+    // --- P4 借网预警: 查周边 3×3 桶里 140px 内的惊飞椋鸟, >=3 只视同猛禽逼近
+    let alert = false, alx = 0, aly = 0, aln = 0;
+    {
+      const cx = clamp(Math.floor((xi + PAD) / CELL), 0, GW - 1);
+      const cy = clamp(Math.floor((yi + PAD) / CELL), 0, GH - 1);
+        for (let ox = -1; ox <= 1; ox++)
+        for (let oy = -1; oy <= 1; oy++) {
+          let gx = cx + ox, gy = cy + oy;
+          if (TORUS) { gx = ((gx % GW) + GW) % GW; gy = ((gy % GH) + GH) % GH; }
+          else if (gx < 0 || gx >= GW || gy < 0 || gy >= GH) continue;
+          const c2 = gy * GW + gx;
+          let m = 0;                                          // 逆链成升序(与旧版同序)
+          for (let j = gridHead[c2]; j !== -1; j = gridNext[j]) chainBuf[m++] = j;
+          for (let q = m - 1; q >= 0; q--) {
+            const j = chainBuf[q];
+            if (!startled[j]) continue;
+            const dx = minImageX(P[2*j] - xi), dy = minImageY(P[2*j+1] - yi);
+            if (dx * dx + dy * dy > ALERT_R2) continue;
+            aln++; alx += V[2*j]; aly += V[2*j+1];      // 跟流: 惊飞鸟的平均速度方向
+          }
+        }
+      if (aln >= ALERT_N) {
+        alert = true;
+        stats.gooseAlerts++;
+        // 附近 400px 内没有猛禽却报警 = 误报(涌现代价: 椋鸟翻滚也会触发)
+        if (d > ALERT_FALSE_R) stats.gooseFalseAlerts++;
+      }
+    }
+
+    let ax = 0, ay = 0;
+    if (disarray > 0) {
+      gooseFleeZ();                            // 第 8 轮
+      // E 斩首混乱期: 槽位力关闭, 全体退化为个体径向逃逸(复用逃逸路径)
+      if (d > 1e-6) {
+        ax += FLEE_W * 1.2 * clamp(nx / d * MAX_SPEED_G - V2[2*i],   -FLEE_FORCE, FLEE_FORCE);
+        ay += FLEE_W * 1.2 * clamp(ny / d * MAX_SPEED_G - V2[2*i+1], -FLEE_FORCE, FLEE_FORCE);
+      }
+    } else if (raptorNear) {
+      gooseFleeZ();                            // 第 8 轮
+      // 编队让位: 逃逸优先, V 形暂时解散(雁的"配合"在此刻让位于保命)
+      ax += FLEE_W * 1.2 * clamp(nx / d * MAX_SPEED_G - V2[2*i],   -FLEE_FORCE, FLEE_FORCE);
+      ay += FLEE_W * 1.2 * clamp(ny / d * MAX_SPEED_G - V2[2*i+1], -FLEE_FORCE, FLEE_FORCE);
+    } else if (alert) {
+      // 借网预警: 不靠自己的眼睛, 直接跟着惊飞椋鸟的流向走(它们逃向 = 远离猛禽)
+      const an = Math.hypot(alx, aly) || 1;
+      const tx2 = alx / an * MAX_SPEED_G, ty2 = aly / an * MAX_SPEED_G;
+      ax += FLEE_W * 1.2 * clamp(tx2 - V2[2*i],   -FLEE_FORCE, FLEE_FORCE);
+      ay += FLEE_W * 1.2 * clamp(ty2 - V2[2*i+1], -FLEE_FORCE, FLEE_FORCE);
+    } else {
+      // 归位: 朝自己的槽位飞(槽位由轮值平移 + 幼雁内道决定)。
+      // 内联槽位计算(原 gooseSlot(i) 每帧给 60 只雁各分配一个 {x,y} 对象);
+      // 注意必须与旧版逐位一致: wrapX/wrapY 先收拢槽位坐标, 再算最小像差。
+      const sl = (i + gooseShift) % M;
+      const rk = slotRank[sl], side = slotArm[sl] * rk * SLOT_SPACING * 0.36;
+      const back = rk * SLOT_SPACING;
+      const sxT = wrapX(Lx - lhx * back - lhy * side);
+      const syT = wrapY(Ly - lhy * back + lhx * side);
+      const gx2 = minImageX(sxT - xi), gy2 = minImageY(syT - yi);
+      const gd = Math.hypot(gx2, gy2);
+      if (gd > 4) {
+        ax += slotScale * clamp(gx2 / gd * LEADER_SPEED - V2[2*i],   -SLOT_FORCE, SLOT_FORCE);
+        ay += slotScale * clamp(gy2 / gd * LEADER_SPEED - V2[2*i+1], -SLOT_FORCE, SLOT_FORCE);
+      }
+      ax += 0.5 * clamp(lhx * LEADER_SPEED - V2[2*i],   -MAX_FORCE, MAX_FORCE);
+      ay += 0.5 * clamp(lhy * LEADER_SPEED - V2[2*i+1], -MAX_FORCE, MAX_FORCE);
+    }
+
+    for (let j = 0; j < M; j++) {              // 雁间弱分离(O(M²), M 小无所谓)
+      if (j === i || !galive[j]) continue;
+      const dx = minImageX(xi - P2[2*j]), dy = minImageY(yi - P2[2*j+1]);
+      const d2 = dx * dx + dy * dy;
+      if (d2 < GSEP_R2 && d2 > 0) {
+        const dd = Math.sqrt(d2);
+        ax += dx / dd * 0.05; ay += dy / dd * 0.05;
+      }
+    }
+
+    if (!TORUS) {
+      if (xi < -PAD) ax += BOUND_FORCE;
+      else if (xi > W + PAD) ax -= BOUND_FORCE;
+      if (yi < -PAD) ay += BOUND_FORCE;
+      else if (yi > H + PAD) ay -= BOUND_FORCE;
+    }
+
+    let eaten = false;                         // 猛禽顺路捕食: 雁值 100 分
+    for (const f of threats) {
+      const ex = minImageX(xi - f.x), ey = minImageY(yi - f.y);
+      const ez = GRAV_ON ? Z2[i] - f.z : 0;                     // 第 8 轮: 3D 判定
+      if (ex * ex + ey * ey + ez * ez < EAT_R2_G) {
+        f.score += SCORE_GOOSE; f.pending += SCORE_GOOSE; f.kills++;
+        if (f.dashT > 0) f.dashEats++;         // A: 这次冲刺确实吃到了东西(雁也算)
+        if (f.kind === "eagle") f.dietGoose++;
+        stats.kills++;
+        gooseDies(i);                          // 死亡流程(幼雁沮丧 / apex 斩首混乱)
+        eaten = true;
+        break;
+      }
+    }
+    if (eaten) continue;
+
+    let vx = V2[2*i] + ax, vy = V2[2*i+1] + ay;
+    const sp = Math.hypot(vx, vy);
+    if (sp > MAX_SPEED_G * leaderHustle) {
+      const lim = MAX_SPEED_G * leaderHustle;
+      vx = vx / sp * lim; vy = vy / sp * lim;
+    }
+    // 每只雁的转向限速(压坡惯性): 速度方向每帧最多转 GOOSE_MAX_TURN
+    const curA = Math.atan2(V2[2*i+1], V2[2*i]);
+    const newA = Math.atan2(vy, vx);
+    const turn = clamp(angDiff(newA, curA), -GOOSE_MAX_TURN, GOOSE_MAX_TURN);
+    const fA = curA + turn;
+    const fSp = Math.hypot(vx, vy);
+    V2[2*i] = Math.cos(fA) * fSp; V2[2*i+1] = Math.sin(fA) * fSp;
+    P2[2*i]   = wrapX(xi + V2[2*i]);
+    P2[2*i+1] = wrapY(yi + V2[2*i+1]);
+    // 第 8 轮 z 轴: 重力 + 朝领队层的弱弹簧(雁群保持稳定的分层, 不散乱)
+    if (GRAV_ON) {
+      const az2 = -G_GRAV * 0.8 + (Z2[leaderIdx] + 6 - Z2[i]) * ALT_SPRING;
+      VZ2[i] = clamp(VZ2[i] + az2, -2.5, 2.5);
+      Z2[i] = Math.max(FLOOR_Z, Z2[i] + VZ2[i]);
+    }
+  }
+
+  /* ---- 6.6 鹰: Q-learning 决策 ----
+   * 状态: 视野内(雁更近? 椋鸟更近?) × (距离近/中/远), 全空 = STATE_NONE
+   * 动作: 0 追椋鸟密集处(会冲刺) / 1 追最近的雁(会冲刺)
+   *       2 游荡伏击(前移拦截点, 不冲刺) / 3 攻击竞争者(最近的隼, 会冲刺)
+   * 奖励: 本帧吃到的分(pending) - 代谢成本(每帧), 帧末按 (s,a)->s' 回流更新
+   * 视野内什么都没有时, 先飞向记忆点, 记忆过期才原地盘旋搜索。 */
+  for (let ei = 0; ei < eagles.length; ei++) {
+    const E = eagles[ei];
+    if (E.stun > 0) E.stun--;                  // E: 眩晕每帧递减(在动作之前)
+    const pc = E.dashT > 0 ? null : perceive(E.x, E.y, E.vx, E.vy, VIEW_EAGLE_R2);
+    E.seeing = !!pc;
+    if (pc) { E.memX = pc.x; E.memY = pc.y; E.memT = frame; }
+    // P2D 威慑锥: 锥内持续失血 —— 走 pending, 让 Q 表把"别闯雁群正面"学进去
+    if (inCone3(E.x, E.y, E.z)) { E.pending -= CONE_EAGLE_DRAIN; stats.coneEagleDrain++; }   // 第 8 轮: 3D 锥
+
+    let gi = -1, gd2 = 1e18;                   // 视野内最近的雁
+    for (let j = 0; j < M; j++) {
+      if (!galive[j]) continue;
+      const dx = minImageX(P2[2*j] - E.x), dy = minImageY(P2[2*j+1] - E.y);
+      const d2 = dx * dx + dy * dy;
+      if (d2 < gd2) { gd2 = d2; gi = j; }
+    }
+    const gDist = gi >= 0 ? Math.sqrt(gd2) : 1e9;
+    const sDist = pc ? Math.hypot(minImageX(pc.x - E.x), minImageY(pc.y - E.y)) : 1e9;
+
+    let ri = -1, rd2 = 1e18;                   // E: 最近的竞争者(隼), 动作 3 的目标
+    for (let k = 0; k < falcons.length; k++) {
+      const dx = minImageX(falcons[k].x - E.x), dy = minImageY(falcons[k].y - E.y);
+      const d2 = dx * dx + dy * dy;
+      if (d2 < rd2) { rd2 = d2; ri = k; }
+    }
+
+    let state;
+    if (gDist === 1e9 && sDist === 1e9) state = STATE_NONE;
+    else {
+      const prey = (gDist < sDist) ? 1 : 0;
+      const dd = Math.min(gDist, sDist);
+      const bin = dd < 200 ? 0 : (dd < 500 ? 1 : 2);
+      state = prey * 3 + bin;
+    }
+
+    let a = 2;                                 // ε-greedy; 无目标时只能游荡
+    if (state === STATE_NONE) {
+      E.hold = 0;
+    } else if (E.hold > 0 && state === E.holdState) {
+      a = E.holdAction; E.hold--;              // 决策纪元内保持同一动作
+    } else {
+      if (Math.random() < E.eps) a = (Math.random() * N_ACTIONS) | 0;
+      else {
+        a = 0;
+        for (let k = 1; k < N_ACTIONS; k++)
+          if (E.Q[state*N_ACTIONS+k] > E.Q[state*N_ACTIONS+a]) a = k;
+      }
+      E.hold = EAGLE_DECIDE_EVERY - 1;
+      E.holdState = state;
+    }
+    E.holdAction = a;
+    E.curState = state; E.curAction = a;
+
+    let txp = 0, typ = 0, tzp = E.z, hasT = false;   // 第 8 轮: tzp = 目标高度(默认保持)
+    if (a === 1 && gi >= 0)      { txp = P2[2*gi];   typ = P2[2*gi+1]; tzp = Z2[gi]; hasT = true; }
+    else if (a === 0 && pc && pc.lockIdx >= 0) {   // P1: 采样出的"捞勺中心"
+      txp = pc.cx; typ = pc.cy; tzp = pc.z; hasT = true;
+    }
+    else if (a === 2 && pc) {
+      // 游荡伏击: 不直线冲进群体, 而是飞到"群体行进方向前方的拦截点"等着。
+      // 中心仍来自采样(P1), 用中心附近代表鸟的速度外推 AMBUSH_LEAD 帧; 伏击不冲刺。
+      let lvx = 0, lvy = 0;
+      if (pc.bi >= 0) { lvx = V[2*pc.bi]; lvy = V[2*pc.bi+1]; }
+      txp = wrapX(pc.cx + lvx * AMBUSH_LEAD);
+      typ = wrapY(pc.cy + lvy * AMBUSH_LEAD);
+      tzp = pc.z; hasT = true;
+    }
+    else if (a === 3 && ri >= 0) { txp = falcons[ri].x; typ = falcons[ri].y; tzp = falcons[ri].z; hasT = true; }
+    else if (freshMem(E))        { txp = E.memX;     typ = E.memY;     hasT = true; }
+
+    const dx = hasT ? minImageX(txp - E.x) : 0;
+    const dy = hasT ? minImageY(typ - E.y) : 0;
+    const dth = hasT ? Math.hypot(dx, dy) : 0;
+
+    if (E.cool > 0) E.cool--;
+    if (E.dashT > 0) {                         // 冲刺惯性: 期间不转向
+      E.dashT--;
+      if (E.dashT === 0) {                     // 冲刺结束
+        if (E.dashEats === 0) {                // A: 空冲刺: 扣分并流进 Q 学习
+          E.score -= MISS_PENALTY_EAGLE;
+          E.pending -= MISS_PENALTY_EAGLE;
+          stats.missEagle++;
+        }
+        E.lockIdx = -1;                        // D: 解除锁定
+      }
+    }
+    else if (E.stun <= 0 && a !== 2 && hasT && dth < EAGLE_DASH_TRIGGER && dth > 1 && E.cool === 0) {
+      const curA = Math.atan2(E.vy, E.vx), tgtA = Math.atan2(dy, dx);
+      if (Math.abs(angDiff(tgtA, curA)) <= DASH_MAX_ANGLE) {
+        E.dashT = EAGLE_DASH_FRAMES; E.cool = EAGLE_DASH_CD;
+        E.dashEats = 0;
+        E.vz = clamp((tzp - E.z) * 0.04, -2.5, 2.5);   // 第 8 轮: 冲刺带垂直初速(俯冲/爬升)
+        // D: 只有"追椋鸟"才是锁定式迷惑(P1: 锁采样中心那 40px 内最近的那只);
+        //    追雁/攻隼不锁(雁大不存在迷惑, 对手不是"吓懵"的对象)
+        E.lockIdx = (DASH_LOCK && a === 0 && pc && pc.lockIdx >= 0) ? pc.lockIdx : -1;
+        if (E.lockIdx >= 0) stats.lockedDashes++;
+      }
+    }
+    // 第 8 轮: 冲刺中受重力 —— 俯冲加速(游隼 stoop), 近地拉起不许撞地
+    if (GRAV_ON && E.dashT > 0) {
+      E.vz -= G_GRAV * 0.7;
+      if (E.z < GROUND_MARGIN && E.vz < 0.3) E.vz = 0.3;
+    }
+    // C: 被围攻拖慢 + E: 眩晕减速(都只作用于非冲刺状态)
+    const slow = Math.max(MOB_SLOW_EAGLE, 1 - E.mob * 0.005) * (E.stun > 0 ? 0.65 : 1);
+    const spd = E.dashT > 0 ? EAGLE_DASH + (GRAV_ON ? Math.max(0, -E.vz) * DIVE_BOOST : 0) : EAGLE_CRUISE * slow;
+    if (E.dashT === 0) {
+      if (hasT && dth > 1) { E.vx += dx / dth * 0.25; E.vy += dy / dth * 0.25; }
+      else {                                   // 纯搜索: 缓慢转向, 画大圈找人
+        const ca = Math.cos(0.05), sa = Math.sin(0.05);
+        const nvx = E.vx * ca + E.vy * sa, nvy = -E.vx * sa + E.vy * ca;
+        E.vx = nvx; E.vy = nvy;
+      }
+    }
+    applyBoundary(E, 2);                       // 开阔世界别飞丢了
+    const vs = Math.hypot(E.vx, E.vy) || 1;
+    E.vx = E.vx / vs * spd; E.vy = E.vy / vs * spd;
+    E.x = wrapX(E.x + E.vx); E.y = wrapY(E.y + E.vy);
+    // 第 8 轮 z 轴: 非冲刺时朝目标高度爬升/俯冲(爬升慢俯冲快), 巡航定高; 近地拉起
+    if (GRAV_ON) {
+      if (E.dashT === 0) {
+        const dzT = tzp - E.z;
+        const des = clamp(dzT / 100, -1, 1) * (dzT > 0 ? 2.6 : 4.2);
+        E.vz += clamp(des - E.vz, -DIVE_RATE, CLIMB_RATE);
+      }
+      if (E.z < GROUND_MARGIN && E.vz < 0.3) E.vz = 0.3;
+      E.z = Math.max(3, E.z + E.vz);
+    }
+    trailPush(E, E.x, E.y, GRAV_ON ? E.z : Z_INIT);
+
+    // Q 更新: 把本帧吃到的分记到上一步 (状态, 动作) 头上
+    E.pending -= METAB_EAGLE;                  // B: 代谢成本先进 pending, 学的才是净期望
+    const reward = E.pending; E.pending = 0;
+    let bn = E.Q[state*N_ACTIONS];
+    for (let k = 1; k < N_ACTIONS; k++)
+      if (E.Q[state*N_ACTIONS+k] > bn) bn = E.Q[state*N_ACTIONS+k];
+    const q = E.lastState * N_ACTIONS + E.lastAction;
+    E.Q[q] += Q_ALPHA * (reward + Q_GAMMA * bn - E.Q[q]);
+    E.lastState = state; E.lastAction = a;
+    E.eps = Math.max(EPS_MIN, E.eps * EPS_DECAY);
+  }
+
+  /* ---- 6.7 隼的策略进化: (1+1)-ES 期界结算(在隼行动之前跑, 新期参数当帧生效) ----
+   * 原则: 制度(能量轮换/拦截位/交棒/驱逐)不学, 学的是制度内的操作参数 ——
+   * 鹰学价值(Q-learning), 隼学策略(进化), 两种学习哲学同框。
+   * 双缓冲: periods 为偶数的期评估"当前参数", 奇数的期评估"当前 + N(0,σ) 截断"的候选;
+   * 期末配对比较(期长 3600 帧, 因为适应度噪声大), 候选更好就采纳(p=cand, gen++),
+   * 否则回滚。适应度 = 期内净得分:
+   *     fit = Δscore - ES_MISS_WEIGHT·Σ落空罚款 - ES_METAB_WEIGHT·Σ代谢成本
+   * 无价值函数、无状态抽象, 纯爬山 —— 允许学成"永不出手"的局部最优(适应度≈0),
+   * 那是诚实的失败模式, 不是 bug。p6 线性冲刺策略留作扩展位(见交接说明)。 */
+  for (let fi = 0; fi < falcons.length; fi++) {
+    const f = falcons[fi], pol = f.policy;
+    if (pol.t === 0) {                           // 期初: 选这一期跑谁
+      if (pol.periods % 2 === 1) {
+        const c = new Float64Array(ES_NP);
+        for (let k = 0; k < ES_NP; k++) c[k] = clamp(pol.p[k] + randn() * ES_SIGMA, 0, 1);
+        pol.evalP = c; pol.isCand = true;        // 候选(每只隼各抽各的, 随机源不共享)
+      } else {
+        pol.evalP = pol.p; pol.isCand = false;   // 保留当前参数
+      }
+      pol.score0 = f.score; pol.miss = 0; pol.metab = 0;
+    }
+    pol.t++;
+    if (pol.t >= (esEvalOverride || ES_EVAL_FRAMES)) {   // 期末: 配对比较 + 采纳/回滚
+      const fit = (f.score - pol.score0) - ES_MISS_WEIGHT * pol.miss - ES_METAB_WEIGHT * pol.metab;
+      pol.lastFit = fit;
+      if (pol.isCand) {
+        if (fit > pol.baseFit) { pol.p.set(pol.evalP); pol.gen++; stats.esAdopt++; }
+      } else {
+        pol.baseFit = fit;
+      }
+      pol.periods++; stats.esPeriods++;
+      pol.t = 0; pol.evalP = null;
+    }
+  }
+
+  /* ---- 6.8 隼: 能量轮换 + 拦截位配合 + (围攻/眩晕/驱逐) + 策略参数(P3) ---- */
+  for (let fi = 0; fi < falcons.length; fi++) {
+    const f = falcons[fi];
+    const isActive = fi === activeId;
+    if (f.stun > 0) f.stun--;                  // E: 眩晕每帧递减
+    if (f.clashCd > 0) f.clashCd--;
+    const PV_ = policyVals(f);                 // P3: 本评估期生效的策略参数
+    const coneHit = inCone3(f.x, f.y, f.z);    // P2D/第 8 轮: 闯进雁群正面 -> 失血(3D 锥)
+    if (coneHit) stats.coneFalconFrames++;
+
+    const pc = f.dashT > 0 ? null : perceive(f.x, f.y, f.vx, f.vy, VIEW_FALCON_R2);
+    f.seeing = !!pc;
+    if (pc) { f.memX = pc.x; f.memY = pc.y; f.memT = frame; f.targetZ = pc.z; }   // 第 8 轮: 目标高度
+
+    if (f.dashT > 0) {
+      // 冲刺: 速度锁定不调整; B 代谢 + C 围攻者越多烧得越快(容忍度 p5 由 ES 学)
+      f.dashT--;
+      const coneMult = coneHit ? CONE_FALCON_DASH_MULT : 1;      // P2D: 锥内冲刺能耗 ×2
+      const drain = (DASH_DRAIN * (1 + f.mob * MOB_DRAIN_PER * PV_.mobTol) + METAB_DASH) * coneMult;
+      f.energy = Math.max(0, f.energy - drain);
+      f.policy.metab += drain;                 // P3: 代谢成本计入适应度
+      applyBoundary(f, 2);
+      // 第 8 轮: 冲刺中受重力 —— 俯冲加速(stoop), 近地拉起
+      if (GRAV_ON) {
+        f.vz -= G_GRAV * 0.7;
+        if (f.z < GROUND_MARGIN && f.vz < 0.3) f.vz = 0.3;
+      }
+      // C: 被围到临界值 -> 冲刺被硬生生打断, 走下面正常的落空罚款流程
+      if (f.mob >= MOB_PENALTY_N) { f.dashT = 0; stats.mobInterrupts++; }
+      const effDash = DASH_SPEED + (GRAV_ON ? Math.max(0, -f.vz) * DIVE_BOOST : 0);
+      const ps = Math.hypot(f.vx, f.vy);
+      if (ps > 1e-9) { f.vx = f.vx / ps * effDash; f.vy = f.vy / ps * effDash; }
+      if (f.dashT === 0) {                     // 冲刺结束
+        if (f.dashEats === 0) {                // A: 空冲刺扣分
+          f.score -= MISS_PENALTY_FALCON;
+          f.policy.miss += MISS_PENALTY_FALCON;   // P3: 落空罚款计入适应度
+          stats.missFalcon++;
+        }
+        // P1 验收取样: 冲刺终点 80px 内还有多少可见鸟(拣软处下口是否自发产生)
+        const pe = perceive(f.x, f.y, f.vx, f.vy, 80 * 80);
+        stats.dashEnds++;
+        stats.dashEndBirds += pe ? pe.n : 0;
+        if (f.dashS > stats.dashMaxEats) stats.dashMaxEats = f.dashS;
+        if (f.lockIdx >= 0) {                  // 锁定冲刺(捕猎)
+          if (f.dashS > stats.dashMaxEatsLocked) stats.dashMaxEatsLocked = f.dashS;
+        } else if (f.dashS > stats.dashMaxEatsFree) stats.dashMaxEatsFree = f.dashS;
+        // P2D 验收: 终点与 V 尖的关系(锥是否真的把冲刺挤开了)
+        if (galiveCount > 0) {
+          const dA = Math.hypot(minImageX(f.x - Lx), minImageY(f.y - Ly));
+          stats.dashEndApexSum += dA;
+          if (dA < 200) stats.dashEndApexNear++;
+          if (inCone3(f.x, f.y, f.z)) stats.dashEndInCone++;      // 第 8 轮: 3D 锥
+        }
+        f.circleT = CIRCLE_FRAMES;
+        f.lockIdx = -1;                        // D: 解除锁定
+      }
+    } else {
+      // C 围攻 + E 眩晕: 都只拖慢非冲刺状态
+      const slow = Math.max(MOB_SLOW_FALCON, 1 - f.mob * 0.01) * (f.stun > 0 ? 0.6 : 1);
+
+      // 盘旋: 缓慢绕圈(所有非冲刺状态都叠这一层转向)
+      const ca = Math.cos(CIRCLE_TURN), sa = Math.sin(CIRCLE_TURN);
+      const nvx = f.vx * ca + f.vy * sa;
+      const nvy = -f.vx * sa + f.vy * ca;
+      f.vx = nvx; f.vy = nvy;
+
+      if (isActive) {
+        // 追猎方: 视野内朝群体质心修正, 看不见就飞向记忆点
+        if (pc) {
+          const dfx = minImageX(pc.x - f.x), dfy = minImageY(pc.y - f.y);
+          const df = Math.hypot(dfx, dfy);
+          if (df > 200) { f.vx += dfx / df * 0.6; f.vy += dfy / df * 0.6; }
+        } else if (freshMem(f)) {
+          const mx = minImageX(f.memX - f.x), my = minImageY(f.memY - f.y);
+          const md = Math.hypot(mx, my);
+          if (md > 1) { f.vx += mx / md * 0.6; f.vy += my / md * 0.6; }
+        }
+        applyBoundary(f, 2);
+        const ps = Math.hypot(f.vx, f.vy);
+        const cspd = CIRCLE_SPEED * slow;
+        if (ps > 1e-9) { f.vx = f.vx / ps * cspd; f.vy = f.vy / ps * cspd; }
+
+        f.energy = Math.min(ENERGY_MAX, f.energy + ACTIVE_REGEN - METAB_CIRCLE);
+        f.policy.metab += METAB_CIRCLE;
+        f.circleT--;
+
+        // 能量低(p2) -> 退出追猎, 让设伏位的另一只立刻接棒
+        if (f.energy < PV_.energyLow) {
+          activeId = (fi + 1) % falcons.length;
+          falcons[activeId].circleT = 0;
+          continue;
+        }
+        // 盘旋期满 + 能量够(p1) + 不晕 + 采样到可用目标 -> 冲刺(60° 约束, D 锁定)
+        if (f.circleT <= 0 && f.energy >= PV_.dashMin && f.stun <= 0 && pc) {
+          if (pc.cx < 0) { stats.noLockAborts++; f.circleT = 4; }   // P1: 40px 内无鸟 -> 放弃(隔几帧再采样)
+          else if (!tryDash(f, pc.cx, pc.cy, pc.lockIdx, pc.z)) f.circleT = 8;   // 第 8 轮: 带目标高度
+        }
+      } else {
+        // 设伏方: 不算全局鸟群, 只用自己视野里的质心推拦截位 ——
+        // 鸟群总朝远离追猎方的方向逃, 逃逸走廊的尽头就是设伏点(p4 外推比例可学)。
+        let travel = false, tx = 0, ty = 0, d = 0;
+        if (pc) {
+          const af = falcons[activeId];
+          const ax0 = minImageX(pc.x - af.x), ay0 = minImageY(pc.y - af.y);
+          const ipx = wrapX(pc.x + ax0 * PV_.interceptAhead);
+          const ipy = wrapY(pc.y + ay0 * PV_.interceptAhead);
+          tx = minImageX(ipx - f.x); ty = minImageY(ipy - f.y);
+          d = Math.hypot(tx, ty);
+          travel = d > INTERCEPT_MIN;
+        } else if (freshMem(f)) {
+          tx = minImageX(f.memX - f.x); ty = minImageY(f.memY - f.y);
+          d = Math.hypot(tx, ty);
+          travel = d > INTERCEPT_MIN;
+        }
+        if (travel && d > 1) {
+          // 未到拦截位: 高速赶路(A 版: 设伏方速度 7.5 > 盘旋 5.0)
+          f.vx += clamp(tx / d * REST_SPEED - f.vx, -0.8, 0.8);
+          f.vy += clamp(ty / d * REST_SPEED - f.vy, -0.8, 0.8);
+        } else if (pc && d > 1) {
+          f.vx += tx / d * INTERCEPT_GAIN;     // 已到位: 小幅贴向设伏点
+          f.vy += ty / d * INTERCEPT_GAIN;
+        }
+        applyBoundary(f, 2);
+        const ps = Math.hypot(f.vx, f.vy);
+        const spd = (travel ? REST_SPEED : CIRCLE_SPEED) * slow;
+        if (ps > 1e-9) { f.vx = f.vx / ps * spd; f.vy = f.vy / ps * spd; }
+
+        f.energy = Math.min(ENERGY_MAX, f.energy + REST_REGEN - METAB_CIRCLE);
+        f.policy.metab += METAB_CIRCLE;
+        f.circleT--;
+
+        // 偶发双打(p3): 设伏方能量很满且采样到可用目标时, 不等接棒直接出手
+        if (f.circleT <= 0 && f.energy >= PV_.doubleTeam && f.stun <= 0 && pc) {
+          if (pc.cx < 0) { stats.noLockAborts++; f.circleT = 4; }
+          else if (!tryDash(f, pc.cx, pc.cy, pc.lockIdx, pc.z)) f.circleT = 10;
+        }
+      }
+
+      // E 驱逐冲刺: 优先级低于捕猎 —— 附近有对手(另一只隼或鹰)且能量够就撞上去,
+      // 撞上后由 6.9 的互攻判定决胜负。没有猎物可追时这就是唯一出路。
+      if (f.dashT === 0 && f.stun <= 0 && f.circleT <= 0 && f.energy >= PV_.dashMin) {
+        let rv = null, rvd2 = 1e18;
+        for (const r of raptors) {
+          if (r === f) continue;
+          const dx = minImageX(r.x - f.x), dy = minImageY(r.y - f.y);
+          const d2 = dx * dx + dy * dy;
+          if (d2 < rvd2) { rvd2 = d2; rv = r; }
+        }
+        if (rv && rvd2 < RIVAL_R * RIVAL_R) {
+          if (!tryDash(f, rv.x, rv.y, -1, rv.z)) f.circleT = 6;   // 第 8 轮: 对手的高度
+        }
+      }
+    }
+    f.x = wrapX(f.x + f.vx);
+    f.y = wrapY(f.y + f.vy);
+    // 第 8 轮 z 轴: 非冲刺时朝目标高度爬升/俯冲, 巡航定高; 近地拉起
+    if (GRAV_ON) {
+      if (f.dashT === 0) {
+        const tzF = (f.targetZ >= 0) ? f.targetZ : f.z;
+        const dzT = tzF - f.z;
+        const des = clamp(dzT / 100, -1, 1) * (dzT > 0 ? 2.6 : 4.2);
+        f.vz += clamp(des - f.vz, -DIVE_RATE, CLIMB_RATE);
+      }
+      if (f.z < GROUND_MARGIN && f.vz < 0.3) f.vz = 0.3;
+      f.z = Math.max(3, f.z + f.vz);
+    }
+    trailPush(f, f.x, f.y, GRAV_ON ? f.z : Z_INIT);
+  }
+
+  /* ---- 6.9 猎物补充 ---- */
+  if (frame % REFILL_CHECK === 0) maybeRefill();
+
+  /* ---- 6.10 猛禽互攻(驱逐制): 三只两两判定 ----
+   * 实力 = 冲刺中 +2 / 鹰体型 +1.5 / 眩晕 -3 / 噪声;
+   * 败方被击退 + 眩晕 + 扣分 + 被抢走剩余分数的 STEAL_FRAC; 胜方拿走抢来的分。
+   * 加了 CLASH_CD 冷却: 否则贴在一起的两只猛禽会逐帧互相扣分, 分数瞬间崩掉。 */
+  for (let i = 0; i < raptors.length; i++) {
+    for (let j = i + 1; j < raptors.length; j++) {
+      const A = raptors[i], B = raptors[j];
+      if (A.clashCd > 0 || B.clashCd > 0) continue;
+      const dx = minImageX(B.x - A.x), dy = minImageY(B.y - A.y);
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= CLASH_R * CLASH_R || d2 < 1e-6) continue;
+
+      const sA = (A.dashT > 0 ? 2 : 0) + (A.kind === "eagle" ? 1.5 : 0) + (A.stun > 0 ? -3 : 0) + Math.random();
+      const sB = (B.dashT > 0 ? 2 : 0) + (B.kind === "eagle" ? 1.5 : 0) + (B.stun > 0 ? -3 : 0) + Math.random();
+      const win = sA >= sB ? A : B, lose = win === A ? B : A;
+      const md = Math.sqrt(d2);
+      const nx = dx / md, ny = dy / md;              // A -> B 的单位向量
+
+      // 败方被击退(位置 + 速度都推一把), 眩晕, 扣分, 被抢分
+      lose.x = wrapX(lose.x + (lose === B ? nx : -nx) * CLASH_KNOCK);
+      lose.y = wrapY(lose.y + (lose === B ? ny : -ny) * CLASH_KNOCK);
+      lose.vx = (lose === B ? nx : -nx) * 4;
+      lose.vy = (lose === B ? ny : -ny) * 4;
+      lose.stun = CLASH_STUN;
+      if (lose.dashT > 0) {                          // 被打断的冲刺同样走落空罚款流程
+        if (lose.dashEats === 0) {
+          if (lose.kind === "eagle") {
+            lose.score -= MISS_PENALTY_EAGLE; lose.pending -= MISS_PENALTY_EAGLE; stats.missEagle++;
+          } else {
+            lose.score -= MISS_PENALTY_FALCON; stats.missFalcon++;
+          }
+        }
+        if (lose.kind !== "eagle") lose.circleT = CIRCLE_FRAMES;
+      }
+      lose.dashT = 0; lose.lockIdx = -1;
+      lose.score -= CLASH_COST;
+      const stolen = lose.score > 0 ? Math.floor(lose.score * STEAL_FRAC) : 0;
+      lose.score -= stolen;
+      win.score += stolen;
+      win.dashEats++;                                // 胜方免空冲刺罚款
+      // 鹰的奖惩要走 pending, 否则 Q 学习看不见互攻这件事
+      if (win.kind === "eagle") win.pending += stolen;
+      if (lose.kind === "eagle") lose.pending -= CLASH_COST;
+      A.clashCd = CLASH_CD; B.clashCd = CLASH_CD;
+      stats.clashes++;
+      if (stolen > 0) stats.steals++;
+    }
+  }
+}
+
+/* ============================================================================
+ * 第 8 轮: 3D 视角层 —— 轨道相机 + 透视投影 + 雾
+ * ----------------------------------------------------------------------------
+ * 世界坐标: x 右, y 下(z 轴向上)。默认 3D 环绕视角(拖拽旋转 / 滚轮缩放 /
+ * 目标自动跟随群体质心与均高); ?view=top 进入旧俯视(投影层退化为恒等映射,
+ * 所有旧渲染路径原样工作)。GL3D 后端不可用时的兜底是 CPU 软投影(慢, 但正确)。
+ * ========================================================================== */
+let VIEW3D = true;
+try { if (/[?&]view=top/.test(window.location.search)) VIEW3D = false; } catch (e) { /* headless */ }
+let gl3dReady = false;
+let ovClear = false;                       // 叠加层本帧是否需要 clear(底层是 GL 不透明画面时)
+const cam = { yaw: 0.7, pitch: 0.52, dist: 950, tx: W / 2, ty: H / 2, tz: Z_INIT, auto: true };
+let vpM = new Float32Array(16);
+
+function perspM(fov, aspect, near, far) {
+  const f = 1 / Math.tan(fov / 2), m = new Float32Array(16);
+  m[0] = f / aspect; m[5] = f; m[10] = (far + near) / (near - far); m[11] = -1;
+  m[14] = 2 * far * near / (near - far);
+  return m;
+}
+function lookAtM(ex, ey, ez, cx, cy, cz) {
+  let fx = cx - ex, fy = cy - ey, fz = cz - ez;
+  const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+  // 世界上方向 = +z
+  const sx = fy, sy = -fx;                  // s = f × up(世界上方向取 +z): (fy, -fx, 0)
+  const sl = Math.hypot(sx, sy) || 1;
+  const ux2 = sy * fz - sz * fy, uy2 = sz * fx - sx * fz, uz2 = sx * fy - sy * fx;  // s × f
+  const m = new Float32Array(16);
+  m[0] = sx;  m[1] = ux2; m[2] = -fx; m[3] = 0;
+  m[4] = sy;  m[5] = uy2; m[6] = -fy; m[7] = 0;
+  m[8] = sz;  m[9] = uz2; m[10] = -fz; m[11] = 0;
+  m[12] = -(sx * ex + sy * ey + sz * ez);
+  m[13] = -(ux2 * ex + uy2 * ey + uz2 * ez);
+  m[14] = (fx * ex + fy * ey + fz * ez);
+  m[15] = 1;
+  return m;
+}
+function mulM(a, b) {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    let t = 0;
+    for (let k = 0; k < 4; k++) t += a[k * 4 + r] * b[c * 4 + k];
+    o[c * 4 + r] = t;
+  }
+  return o;
+}
+function updateCamera() {
+  cam.tx += (cxmI - cam.tx) * 0.04;
+  cam.ty += (cymI - cam.ty) * 0.04;
+  cam.tz += (zMeanLive - cam.tz) * 0.04;
+  if (cam.auto) cam.yaw += 0.0022;         // 无输入时缓慢公转
+  cam.pitch = clamp(cam.pitch, -1.25, 1.42);
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const ex = cam.tx + Math.sin(cam.yaw) * cp * cam.dist;
+  const ey = cam.ty - Math.cos(cam.yaw) * cp * cam.dist;
+  const ez = Math.max(24, cam.tz + sp * cam.dist + 40);
+  vpM = mulM(perspM(0.92, W / H, 2, 6000), lookAtM(ex, ey, ez, cam.tx, cam.ty, cam.tz));
+}
+
+/* 3D -> 屏幕。俯视模式退化为恒等映射(与旧 2D 完全一致);
+ * s = 近大远小系数, f = 雾(远淡), ok = 在视锥内。 */
+const PR_A = { x: 0, y: 0, s: 1, f: 1, ok: true };
+const PR_B = { x: 0, y: 0, s: 1, f: 1, ok: true };
+const PR_C = { x: 0, y: 0, s: 1, f: 1, ok: true };
+function project(x, y, z, out) {
+  if (!VIEW3D) { out.x = x; out.y = y; out.s = 1; out.f = 1; out.ok = true; return out; }
+  const m = vpM;
+  const cx = m[0] * x + m[4] * y + m[8] * z + m[12];
+  const cy = m[1] * x + m[5] * y + m[9] * z + m[13];
+  const cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+  if (cw < 2) { out.ok = false; return out; }
+  out.ok = true;
+  out.x = (cx / cw * 0.5 + 0.5) * W;
+  out.y = (0.5 - cy / cw * 0.5) * H;
+  out.s = clamp(420 / cw, 0.22, 3.4);
+  out.f = clamp(1.3 - cw * 0.00115, 0.18, 1);
+  return out;
+}
+
+function toggleView() {
+  VIEW3D = !VIEW3D;
+  const b = document.getElementById("btnView");
+  if (b) b.textContent = VIEW3D ? "切换俯视（T）" : "切换 3D（T）";
+  if (VIEW3D && !gl3dReady && !glTried) tryInitGL();
+}
+
+/* 相机输入: 左键拖拽旋转(自动关自动环绕), 滚轮缩放; 面板是独立 DOM, 不冲突 */
+(function camInput() {
+  const stage = document.getElementById("stage");
+  let dragging = false, lx = 0, ly = 0;
+  stage.addEventListener("mousedown", e => { dragging = true; lx = e.clientX; ly = e.clientY; cam.auto = false;
+    const cb = document.getElementById("cbAuto"); if (cb) cb.checked = false; });
+  window.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    cam.yaw += (e.clientX - lx) * 0.006;
+    cam.pitch = clamp(cam.pitch + (e.clientY - ly) * 0.005, -1.25, 1.42);
+    lx = e.clientX; ly = e.clientY;
+  });
+  window.addEventListener("mouseup", () => dragging = false);
+  stage.addEventListener("wheel", e => {
+    e.preventDefault();
+    cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.001), 260, 3400);
+  }, { passive: false });
+})();
+
+/* ------------------------------ 7. 渲染 ------------------------------ */
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const qcv = document.getElementById("qcv");
+const qctx = qcv.getContext("2d");
+
+// 渲染后端选择: 默认 WebGL(底层实例化), ?render=2d 强制走原来的 Canvas2D 全路径
+let glReady = false, glTried = false, forceGL = false, glUsed = false;
+let want2D = false;
+try { want2D = /[?&]render=2d/.test(window.location.search); } catch (e) { /* 无 location(headless) */ }
+
+// 性能 EMA(面板与 SIM.perf 都用它): stepMs / renderMs / gl + WebGPU 计算三段耗时
+const perf = { stepMs: 0, renderMs: 0, gl: false, uploadMs: 0, gpuMs: 0, readbackMs: 0 };
+function perfPush(step, render) {
+  perf.stepMs = perf.stepMs * 0.9 + step * 0.1;
+  perf.renderMs = perf.renderMs * 0.9 + render * 0.1;
+}
+
+// 计算后端选择: ?compute=cpu | gpu | auto(默认). CPU 路径永久保留作参照与兜底。
+let computeMode = "auto", gpuCompute = false;
+try {
+  const m = /[?&]compute=(\w+)/.exec(window.location.search);
+  if (m && ["cpu", "gpu", "auto"].indexOf(m[1]) >= 0) computeMode = m[1];
+} catch (e) { /* 无 location(headless) */ }
+let computeSelfCheck = null, computeInitInfo = null;
+let diagMode = false;                          // ?diag=1: 周期性往控制台打一行性能/状态, 便于无头或真机取证
+try { diagMode = /[?&]diag=1/.test(window.location.search); } catch (e) { /* 无 location */ }
+let diagTicks = 0;
+let initTimeoutMs = 3000;                      // WebGPU 初始化超时(?initTimeout=ms 可调, 慢机器/冷启动用)
+try {
+  const m = /[?&]initTimeout=(\d+)/.exec(window.location.search);
+  if (m) initTimeoutMs = Math.max(500, Math.min(60000, +m[1]));
+} catch (e) { /* 无 location */ }
+
+// 交给 WebGPU 计算后端(第三个 <script>)的场景桥: 定型数组 + 网格常量 + CPU 参考实现的回调
+const computeScene = {
+  W, H, P, V, ACC, alive, maxN: MAXN,
+  counts: () => ({ n: N }),
+  grid: {
+    get gw() { return GW; }, get gh() { return GH; },
+    get topoK() { return topoK; }, cell: CELL, pad: PAD, torus: TORUS,
+    perceptionR2: PERCEPTION_R2, sepR2: SEP_R2, sepGain: SEP_GAIN,
+    maxSpeed: MAX_SPEED, maxForce: MAX_FORCE, cohesionW: COHESION_W, alignmentW: ALIGNMENT_W,
+  },
+  // 自检用: 跑一遍 CPU 版 6.1+6.2 并把 ACC 拷进 out(不动其它状态)
+  cpuForces: (out) => {
+    const saveCxm = cxmI, saveCym = cymI;
+    cpuGridAndForces(TORUS);
+    out.set(ACC.subarray(0, out.length));
+    cxmI = saveCxm; cymI = saveCym;
+  },
+  perf,
+};
+
+// 交给 WebGL 后端的场景桥(第二个 <script> 区块里的 GLBackend 直接读这些定型数组)
+const glScene = {
+  W, H, P, V, alive, P2, V2, galive, maxN: MAXN, maxM: M,
+  Z, VZ, Z2, VZ2,                                    // 第 8 轮: 3D 实例属性源
+  counts: () => ({ n: N, m: M, aliveCount, galiveCount }),
+  colors: { starling: [200 / 255, 215 / 255, 235 / 255], goose: [255 / 255, 200 / 255, 110 / 255] },
+  shapes: { starling: BODY_S, goose: BODY_G },   // [尖端, 尾长, 翼展] 与 2D 的 drawArrow 共用同一组常量
+  bg: [10 / 255, 12 / 255, 18 / 255],
+  fade: 0.16,                                    // 与 fillRect(rgba(10,12,18,0.16)) 等价
+  perf,
+};
+
+// ---- UI 状态 ----
+let showVision = false, showFormation = true, refillOn = true;
+let paused = false, speedMul = 1;
+let fpsEma = 60, lastT = performance.now(), lastPanelT = 0;
+
+// 渲染侧零分配: 虚线样式数组与辉光精灵都预生成一次, 不再每帧 new
+const EMPTY_DASH = [];
+const DASH_VISION = [4, 10], DASH_MEM = [5, 7], DASH_AXIS = [3, 9], DASH_FORM = [6, 8], DASH_MINI = [3, 4];
+const glowSprites = new Map();                // 颜色 -> 64×64 预渲染径向辉光
+function glowSprite(C) {
+  let s = glowSprites.get(C);
+  if (s) return s;
+  const c = document.createElement("canvas");
+  c.width = 64; c.height = 64;
+  const g2 = c.getContext("2d");
+  const grad = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, `rgba(${C}, 1)`);
+  grad.addColorStop(1, `rgba(${C}, 0)`);
+  g2.fillStyle = grad;
+  g2.fillRect(0, 0, 64, 64);
+  glowSprites.set(C, c);
+  return c;
+}
+
+function drawArrow(x, y, vx, vy, sTip, sBack, sWing) {
+  // 通用 ">": 尖端在速度方向 sTip 处, 批量塞进同一条 path 一次描边
+  const sp = Math.hypot(vx, vy) || 1;
+  const ux = vx / sp, uy = vy / sp, qx = -uy, qy = ux;
+  const tx = x + ux * sTip, ty = y + uy * sTip;
+  const bx = x - ux * sBack, by = y - uy * sBack;
+  ctx.moveTo(bx + qx * sWing, by + qy * sWing);
+  ctx.lineTo(tx, ty);
+  ctx.lineTo(bx - qx * sWing, by - qy * sWing);
+}
+
+// 拖尾环形缓冲: 定容 Float32Array + 头指针, 推一个点 O(1), 永不分配(第 8 轮: 3 分量)
+function trailPush(o, x, y, z) {
+  const L = TRAIL_LEN;
+  if (o.trailN < L) {
+    const idx = (o.trailHead + o.trailN) * 3;
+    o.trailBuf[idx] = x; o.trailBuf[idx + 1] = y; o.trailBuf[idx + 2] = z; o.trailN++;
+  } else {
+    o.trailBuf[o.trailHead * 3] = x; o.trailBuf[o.trailHead * 3 + 1] = y; o.trailBuf[o.trailHead * 3 + 2] = z;
+    o.trailHead = (o.trailHead + 1) % L;
+  }
+}
+
+/* ---- 第 8 轮: 尸体下坠(被吃的鸟带初速做抛体, 落地停住后消散) ---- */
+const CORPSE_CAP = 384;
+const cX = new Float32Array(CORPSE_CAP), cY = new Float32Array(CORPSE_CAP), cZ = new Float32Array(CORPSE_CAP);
+const cVX = new Float32Array(CORPSE_CAP), cVY = new Float32Array(CORPSE_CAP), cVZ = new Float32Array(CORPSE_CAP);
+const cT = new Float32Array(CORPSE_CAP);          // 存活帧数(0 = 空位)
+let cCursor = 0;
+function spawnCorpse(x, y, z, vx, vy, vz) {
+  const k = cCursor;
+  cX[k] = x; cY[k] = y; cZ[k] = z; cVX[k] = vx; cVY[k] = vy; cVZ[k] = vz; cT[k] = 1;
+  cCursor = (cCursor + 1) % CORPSE_CAP;
+}
+function stepCorpses() {
+  if (!GRAV_ON) return;
+  for (let k = 0; k < CORPSE_CAP; k++) {
+    if (cT[k] <= 0) continue;
+    cT[k]++;
+    cVZ[k] -= 0.055;                             // 尸体只受重力(无弹簧)
+    cX[k] += cVX[k]; cY[k] += cVY[k]; cZ[k] += cVZ[k];
+    if (cZ[k] <= FLOOR_Z) {                      // 落地: 滑动衰减, 停留 60 帧后消散
+      cZ[k] = FLOOR_Z; cVX[k] *= 0.8; cVY[k] *= 0.8; cVZ[k] = 0;
+      if (cT[k] > 60) cT[k] = 0;
+    } else if (cT[k] > 240) cT[k] = 0;
+  }
+}
+
+// 拖尾颜色字符串缓存: 按(颜色, 透明度档位)预生成, 避免每段一次模板字符串
+const TRAIL_BUCKETS = 12;
+const trailColorCache = new Map();
+function trailColor(C, a) {
+  let bucket = (a * TRAIL_BUCKETS) | 0;
+  if (bucket < 0) bucket = 0; else if (bucket >= TRAIL_BUCKETS) bucket = TRAIL_BUCKETS - 1;
+  const key = C + "|" + bucket;
+  let s = trailColorCache.get(key);
+  if (s === undefined) {
+    s = `rgba(${C}, ${((bucket + 0.5) / TRAIL_BUCKETS).toFixed(3)})`;
+    trailColorCache.set(key, s);
+  }
+  return s;
+}
+
+// 猛禽的公共画法(隼/鹰共用; 第 8 轮: 全坐标过 project(), 近大远小 + 雾)。
+// 返回 {x,y,s,f} 给标签/能量条复用; 在视锥外返回 null。
+function drawHunter(h, dash, opt) {
+  const C = h.color;
+  project(h.x, h.y, h.z, PR_A);
+  if (!PR_A.ok) return null;
+  const sx = PR_A.x, sy = PR_A.y, ss = PR_A.s, ff = PR_A.f;
+
+  const n = h.trailN;
+  if (n >= 2) {                                // 环形缓冲按时间序连点(3D 投影)
+    const L = TRAIL_LEN;
+    ctx.lineCap = "round";
+    let px = 0, py = 0, open = true;
+    for (let k = 0; k < n; k++) {
+      const idx = ((h.trailHead + k) % L) * 3;
+      project(h.trailBuf[idx], h.trailBuf[idx + 1], h.trailBuf[idx + 2], PR_B);
+      if (!PR_B.ok) { open = true; continue; }
+      if (!open) {
+        const dx = PR_B.x - px, dy = PR_B.y - py;
+        if (dx * dx + dy * dy <= 2500 * ss * ss) {   // 投影跳变(转到背侧)不连线
+          ctx.strokeStyle = trailColor(C, opt.trailA * (k + 1) / n * ff);
+          ctx.lineWidth = (dash ? 2.5 : 1.5) * Math.max(0.55, ss);
+          if (dash) { ctx.shadowColor = `rgb(${C})`; ctx.shadowBlur = 14; }
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(PR_B.x, PR_B.y);
+          ctx.stroke();
+        }
+      }
+      px = PR_B.x; py = PR_B.y; open = false;
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  if (h.shock) {                               // 冲刺冲击波(带高度)
+    h.shock.t++;
+    const alpha = (1 - h.shock.t / 35) * ff;
+    if (h.shock.t >= 35 || alpha <= 0.02) h.shock = null;
+    else {
+      project(h.shock.x, h.shock.y, h.shock.z || Z_INIT, PR_B);
+      const r = h.shock.t * 9 * ss;
+      if (PR_B.ok && r > 0.6) {
+        ctx.strokeStyle = `rgba(${C}, ${alpha * 0.8})`;
+        ctx.lineWidth = 2.5 * ss;
+        ctx.shadowColor = `rgb(${C})`; ctx.shadowBlur = 20;
+        ctx.beginPath();
+        ctx.arc(PR_B.x, PR_B.y, r, 0, TAU);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+    }
+  }
+
+  if (showVision && opt.visionR) {             // 视野球 -> 屏幕圆(半径随深度缩放)
+    const r = opt.visionR * ss;
+    if (r > 4) {
+      ctx.save();
+      ctx.setLineDash(DASH_VISION);
+      ctx.strokeStyle = `rgba(${C}, ${0.10 * ff})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  if (!h.seeing && freshMem(h)) {              // 搜索中: 朝记忆点的虚线
+    project(h.memX, h.memY, h.z, PR_B);
+    if (PR_B.ok) {
+      ctx.save();
+      ctx.setLineDash(DASH_MEM);
+      ctx.strokeStyle = `rgba(${C}, ${0.20 * ff})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(PR_B.x, PR_B.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  const glowR = (dash ? opt.glowDash : opt.glow) * ss;
+  ctx.globalAlpha = (dash ? 0.55 : opt.glowA) * ff;
+  ctx.drawImage(glowSprite(C), sx - glowR, sy - glowR, glowR * 2, glowR * 2);
+  ctx.globalAlpha = 1;
+
+  // 朝向: 投影"位置 + 速度×6"两点, 用屏幕连线方向画 ">"(飞行姿态在屏幕上自然呈现)
+  project(h.x + h.vx * 6, h.y + h.vy * 6, h.z + h.vz * 6, PR_B);
+  const avx = PR_B.ok ? PR_B.x - sx : h.vx, avy = PR_B.ok ? PR_B.y - sy : h.vy;
+  ctx.strokeStyle = `rgb(${C})`;
+  ctx.lineWidth = (dash ? 2.2 : 1.5) * Math.max(0.55, ss);
+  ctx.shadowColor = `rgb(${C})`;
+  ctx.shadowBlur = dash ? 24 : 12;
+  ctx.beginPath();
+  drawArrow(sx, sy, avx, avy, (dash ? opt.size[0] : opt.size[1]) * ss, opt.size[2] * ss, opt.size[2] * ss);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  PR_C.x = sx; PR_C.y = sy; PR_C.s = ss; PR_C.f = ff;
+  return PR_C;
+}
+
+/* render2D(): 原 Canvas2D 全路径(拖尾残影 + 鸟群本体), 由 ?render=2d 或 GL 不可用时走
+   renderOverlay(): 两种模式共用的 2D 叠加层(威慑锥/编队线/涟漪/猛禽/小地图/标签) */
+function render2D() {
+  // GL 曾经跑过又中途降级时, 底层 canvas 还留着上一帧, 先铺一层不透明背景
+  if (glUsed) { ctx.fillStyle = "#0a0c12"; ctx.fillRect(0, 0, W, H); glUsed = false; }
+  // 半透明覆盖 = 所有鸟自带拖尾(代价低, 效果好)
+  ctx.fillStyle = "rgba(10, 12, 18, 0.16)";
+  ctx.fillRect(0, 0, W, H);
+
+  if (!TORUS) {                                // 视口只是世界的一扇窗
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  }
+
+  // ---- 椋鸟(灰白, 一批 path 一次描边; F: 体型收小) ----
+  ctx.strokeStyle = "rgb(200, 215, 235)";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  for (let i = 0; i < N; i++) {
+    if (!alive[i]) continue;
+    drawArrow(P[2*i], P[2*i+1], V[2*i], V[2*i+1], BODY_S[0], BODY_S[1], BODY_S[2]);
+  }
+  ctx.stroke();
+
+  // 雁的本体(2D 路径); GL 模式下这两段由 shader 实例化绘制
+  ctx.strokeStyle = "rgb(255, 200, 110)";
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  for (let i = 0; i < M; i++) {
+    if (!galive[i]) continue;
+    drawArrow(P2[2*i], P2[2*i+1], V2[2*i], V2[2*i+1], BODY_G[0], BODY_G[1], BODY_G[2]);
+  }
+  ctx.stroke();
+
+  renderOverlay();
+}
+
+// 2D 叠加层(第 8 轮: 全部经 project() —— 俯视模式退化为旧 2D 行为):
+// 猛禽/标签/能量条/涟漪/尸体/小地图/视野圈/配合轴线/威慑锥。实体数 <= 20, Canvas2D 够用。
+function renderOverlay() {
+  if (ovClear) ctx.clearRect(0, 0, W, H);      // 底层 GL 已画不透明画面 -> 先清叠加层
+  else if (!TORUS) {
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  }
+
+  // ---- 雁群: 威慑锥(3D 扇形投影) / 编队线 / 数量标签 ----
+  if (galiveCount > 0) {
+    const LZ = Z2[leaderIdx];
+    const fan = (r, fill, stroke) => {
+      project(Lx, Ly, LZ, PR_A);
+      if (!PR_A.ok) return;
+      ctx.beginPath();
+      ctx.moveTo(PR_A.x, PR_A.y);
+      let closed = false;
+      for (let k = 0; k <= 14; k++) {
+        const a = leaderAng - CONE_HALF_ANGLE + (k / 14) * CONE_HALF_ANGLE * 2;
+        project(Lx + Math.cos(a) * r, Ly + Math.sin(a) * r, LZ, PR_B);
+        if (!PR_B.ok) { closed = false; continue; }
+        ctx.lineTo(PR_B.x, PR_B.y);
+        closed = true;
+      }
+      if (!closed) return;
+      ctx.closePath();
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+    };
+    fan(CONE_R, "rgba(120, 190, 255, 0.045)");
+    fan(CONE_R * 0.55, "rgba(120, 190, 255, 0.05)");
+    fan(CONE_R, null, "rgba(120, 190, 255, 0.18)");
+  }
+  if (showFormation) {                         // V 形两条翼的引导线(投影端点)
+    const hx = Math.cos(leaderAng), hy = Math.sin(leaderAng);
+    const qx = -hy, qy = hx;
+    const rank = (M >> 1);
+    const back = rank * SLOT_SPACING, side = rank * SLOT_SPACING * 0.36;
+    ctx.save();
+    ctx.setLineDash(DASH_FORM);
+    ctx.strokeStyle = "rgba(255, 200, 110, 0.13)";
+    ctx.lineWidth = 1;
+    for (const arm of [1, -1]) {
+      project(Lx, Ly, Z2[leaderIdx], PR_A);
+      project(Lx - hx * back + qx * side * arm, Ly - hy * back + qy * side * arm, Z2[leaderIdx], PR_B);
+      if (PR_A.ok && PR_B.ok) {
+        ctx.beginPath();
+        ctx.moveTo(PR_A.x, PR_A.y);
+        ctx.lineTo(PR_B.x, PR_B.y);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  project(Lx, Ly, Z2[leaderIdx], PR_A);
+  if (PR_A.ok) {
+    ctx.fillStyle = "rgb(255, 200, 110)";
+    ctx.font = "bold 12px 'Microsoft YaHei', sans-serif";
+    ctx.fillText("雁 GEESE ×" + galiveCount, PR_A.x + 12, PR_A.y - 10);
+  }
+
+  // ---- 死亡涟漪(投影到群体高度层) + 尸体下坠(3D 点, 落地渐隐) ----
+  for (let k = 0; k < DEATH_CAP; k++) {
+    if (deathT[k] <= 0) continue;
+    const t = ++deathT[k], alpha = 1 - t / 22;
+    if (alpha <= 0) { deathT[k] = 0; continue; }
+    project(deathX[k], deathY[k], Z_INIT, PR_A);
+    if (!PR_A.ok) continue;
+    ctx.strokeStyle = `rgba(255, 110, 100, ${alpha * 0.9 * PR_A.f})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(PR_A.x, PR_A.y, (2 + t * 0.4) * PR_A.s, 0, TAU);
+    ctx.stroke();
+  }
+  if (GRAV_ON) {
+    ctx.fillStyle = "rgb(180, 195, 215)";
+    for (let k = 0; k < CORPSE_CAP; k++) {
+      if (cT[k] <= 0) continue;
+      project(cX[k], cY[k], cZ[k], PR_A);
+      if (!PR_A.ok) continue;
+      const grounded = cZ[k] <= FLOOR_Z;
+      const fade = grounded ? Math.max(0, 1 - (cT[k] - 1) / 60) : 1;
+      ctx.globalAlpha = 0.55 * PR_A.f * fade;
+      const r = Math.max(1, 1.6 * PR_A.s);
+      ctx.fillRect(PR_A.x - r / 2, PR_A.y - r / 2, r, r);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- 隼群配合轴线(投影, 极淡虚线) ----
+  if (falcons.length >= 2) {
+    const f1 = falcons[0], f2 = falcons[1];
+    project(f1.x, f1.y, f1.z, PR_A);
+    project(f1.x + minImageX(f2.x - f1.x), f1.y + minImageY(f2.y - f1.y), f2.z, PR_B);
+    if (PR_A.ok && PR_B.ok) {
+      ctx.save();
+      ctx.setLineDash(DASH_AXIS);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PR_A.x, PR_A.y);
+      ctx.lineTo(PR_B.x, PR_B.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ---- 隼 ----
+  for (let fi = 0; fi < falcons.length; fi++) {
+    const f = falcons[fi];
+    const dash = f.dashT > 0;
+    const isActive = fi === activeId;
+    const hp = drawHunter(f, dash, { visionR: VIEW_FALCON, trailA: 0.7, glowDash: 20, glow: 14,
+                          glowA: isActive ? 0.35 : 0.18, size: BODY_F });
+    if (!hp) continue;
+    const bw = 28 * hp.s, bh = 3 * Math.max(0.6, hp.s), bx = hp.x - bw / 2, by = hp.y - 20 * hp.s;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = `rgb(${f.color})`;
+    ctx.fillRect(bx, by, bw * f.energy / ENERGY_MAX, bh);
+    ctx.fillStyle = `rgba(200, 200, 200, ${0.6 * hp.f})`;
+    ctx.font = "10px 'Microsoft YaHei', sans-serif";
+    ctx.fillText(isActive ? "追猎" : "设伏", bx + bw + 3, by + bh);
+    ctx.fillStyle = `rgba(150, 200, 160, ${0.75 * hp.f})`;
+    ctx.fillText("策略 " + f.policy.gen + "代", bx, by - 4);
+    if (f.stun > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${0.9 * hp.f})`;
+      ctx.fillText("眩晕 " + f.stun, bx - 1, by - 15);
+    }
+    ctx.fillStyle = `rgb(${f.color})`;
+    ctx.font = "bold 12px 'Microsoft YaHei', sans-serif";
+    ctx.fillText(f.label, hp.x + 11 * hp.s, hp.y - 8 * hp.s);
+  }
+
+  // ---- 鹰(支持多只; 0 只时自然跳过) ----
+  for (let ei = 0; ei < eagles.length; ei++) {
+    const E = eagles[ei];
+    const dash = E.dashT > 0;
+    const hp = drawHunter(E, dash, { visionR: VIEW_EAGLE, trailA: 0.55, glowDash: 19, glow: 16,
+                          glowA: 0.4, size: BODY_E });
+    if (!hp) continue;
+    ctx.fillStyle = "rgb(255, 190, 60)";
+    ctx.font = "bold 12px 'Microsoft YaHei', sans-serif";
+    ctx.fillText(E.label + "  ε=" + E.eps.toFixed(2), hp.x + 12 * hp.s, hp.y - 10 * hp.s);
+    if (E.stun > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${0.9 * hp.f})`;
+      ctx.font = "10px 'Microsoft YaHei', sans-serif";
+      ctx.fillText("眩晕 " + E.stun, hp.x - 16 * hp.s, hp.y - 22 * hp.s);
+    }
+  }
+
+  drawMinimap();
+}
+
+/* 3D 软件兜底渲染(GL3D 不可用且处于 3D 视角时): CPU 投影 + 雾, 慢但正确。
+ * 椋鸟/雁各一批 path; 大小/透明度随深度。仅作兜底, 正常路径走 GL3D 实例化。 */
+function renderSoft3D() {
+  ctx.fillStyle = "#0a0c12";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgb(200, 215, 235)";
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < N; i++) {
+    if (!alive[i]) continue;
+    project(P[2*i], P[2*i+1], Z[i], PR_A);
+    if (!PR_A.ok) continue;
+    project(P[2*i] + V[2*i] * 4, P[2*i+1] + V[2*i+1] * 4, Z[i] + VZ[i] * 4, PR_B);
+    ctx.globalAlpha = PR_A.f;
+    ctx.beginPath();
+    if (PR_B.ok) drawArrow(PR_A.x, PR_A.y, PR_B.x - PR_A.x, PR_B.y - PR_A.y,
+                           BODY_S[0] * PR_A.s, BODY_S[1] * PR_A.s, BODY_S[2] * PR_A.s);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "rgb(255, 200, 110)";
+  for (let i = 0; i < M; i++) {
+    if (!galive[i]) continue;
+    project(P2[2*i], P2[2*i+1], Z2[i], PR_A);
+    if (!PR_A.ok) continue;
+    project(P2[2*i] + V2[2*i] * 4, P2[2*i+1] + V2[2*i+1] * 4, Z2[i] + VZ2[i] * 4, PR_B);
+    ctx.globalAlpha = PR_A.f;
+    ctx.beginPath();
+    if (PR_B.ok) drawArrow(PR_A.x, PR_A.y, PR_B.x - PR_A.x, PR_B.y - PR_A.y,
+                           BODY_G[0] * PR_A.s, BODY_G[1] * PR_A.s, BODY_G[2] * PR_A.s);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---- 渲染分发(第 8 轮: 3D 视角优先, 俯视/2D 全路径保留作 A/B 与兜底) ---- */
+function render() {
+  const t0 = performance.now();
+  updateCamera();                              // 相机跟随群体质心+均高(每帧, 暂停时也生效)
+  if (VIEW3D) {
+    if (gl3dReady) {
+      try {
+        window.GLBackend.draw3D(glScene, vpM); // 底层: 透视 + 深度 + 雾, 两批实例化
+        glUsed = true;
+      } catch (e) {
+        gl3dReady = false;
+        console.warn("WebGL3D 异常, 回退软渲染:", e && e.message);
+      }
+    }
+    if (!gl3dReady) renderSoft3D();            // CPU 投影兜底(慢, 但行为正确)
+    ovClear = gl3dReady;                       // GL 底不透明 -> 叠加层要清; 软渲染画在 ctx 上 -> 不清
+    renderOverlay();
+  } else {
+    if (glReady) {
+      try {
+        window.GLBackend.draw(glScene);        // 旧 2D 实例化(俯视专用)
+        glUsed = true;
+      } catch (e) {
+        glReady = false;
+        perf.gl = false;
+        console.warn("WebGL 后端异常, 回退 Canvas2D:", e && e.message);
+      }
+    }
+    ovClear = glReady;
+    if (glReady) renderOverlay();
+    else render2D();                           // 原 Canvas2D 全路径
+  }
+  perf.renderMs = perf.renderMs * 0.9 + (performance.now() - t0) * 0.1;
+  perf.gl = glReady;
+}
+
+// 小地图: 开阔世界专用 —— 视口只是一部分, 必须有个全局视图看鸟群跑哪去了
+function drawMinimap() {
+  if (TORUS) return;
+  const mw = 210, mh = mw * (H + 2 * PAD) / (W + 2 * PAD);
+  const ox = 14, oy = H - 14 - mh;
+  const sx = mw / (W + 2 * PAD), sy = mh / (H + 2 * PAD);
+  const mx = x => ox + (x + PAD) * sx, my = y => oy + (y + PAD) * sy;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(10, 12, 18, 0.6)";
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.rect(ox, oy, mw, mh); ctx.fill(); ctx.stroke();
+
+  ctx.setLineDash(DASH_MINI);                     // 视口范围
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.beginPath(); ctx.rect(mx(0), my(0), W * sx, H * sy); ctx.stroke();
+  ctx.setLineDash(EMPTY_DASH);
+
+  ctx.fillStyle = "rgba(200,215,235,0.5)";     // 椋鸟抽样, 1px 点
+  for (let i = 0; i < N; i += 6) {
+    if (!alive[i]) continue;
+    ctx.fillRect(mx(P[2*i]) - 0.5, my(P[2*i+1]) - 0.5, 1, 1);
+  }
+  ctx.fillStyle = "rgb(255,200,110)";          // 雁
+  for (let i = 0; i < M; i++) {
+    if (!galive[i]) continue;
+    ctx.fillRect(mx(P2[2*i]) - 1, my(P2[2*i+1]) - 1, 2, 2);
+  }
+  for (const f of threats) {                   // 猛禽
+    ctx.fillStyle = `rgb(${f.color})`;
+    ctx.fillRect(mx(f.x) - 1.5, my(f.y) - 1.5, 3, 3);
+  }
+  // P2: 领队位置 + 威慑锥方向(小地图上最容易看出"雁群在躲谁")
+  if (galiveCount > 0) {
+    ctx.fillStyle = "rgba(120,190,255,0.9)";
+    ctx.fillRect(mx(Lx) - 2, my(Ly) - 2, 4, 4);
+    ctx.strokeStyle = "rgba(120,190,255,0.5)";
+    ctx.beginPath();
+    ctx.moveTo(mx(Lx), my(Ly));
+    ctx.lineTo(mx(Lx + Math.cos(leaderAng) * 60), my(Ly + Math.sin(leaderAng) * 60));
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "rgba(150,155,168,0.75)";
+  ctx.font = "10px 'Microsoft YaHei', sans-serif";
+  ctx.fillText(`开阔世界 ${W + 2 * PAD}×${H + 2 * PAD}（虚线 = 视口）`, ox + 2, oy - 4);
+  ctx.restore();
+}
+
+// 鹰脑 Q 表热力图(小 canvas, 6Hz 刷新足够)
+function renderQ() {
+  const w = qcv.width, h = qcv.height;
+  qctx.clearRect(0, 0, w, h);
+  if (!eagles.length) {                        // 第 8 轮: 鹰减到 0 时 Q 表留空
+    qctx.fillStyle = "rgba(150,155,170,0.5)";
+    qctx.font = "10px 'Microsoft YaHei', sans-serif";
+    qctx.fillText("无鹰(增援已清空)", 6, h / 2);
+    return;
+  }
+  qctx.fillStyle = "rgba(255,255,255,0.03)";
+  qctx.fillRect(0, 0, w, h);
+
+  const labelW = 30, headH = 15;
+  const cw = (w - labelW) / N_ACTIONS, ch = (h - headH) / N_STATES;
+  const rows = ["椋近", "椋中", "椋远", "雁近", "雁中", "雁远", "全空"];
+  const cols = ["追椋", "追雁", "伏击", "攻隼"];
+
+  let maxQ = 1e-6;
+  for (let s = 0; s < N_STATES; s++)
+    for (let a = 0; a < N_ACTIONS; a++)
+      maxQ = Math.max(maxQ, eagle.Q[s * N_ACTIONS + a]);
+
+  qctx.font = "9px 'Microsoft YaHei', sans-serif";
+  qctx.textBaseline = "middle";
+  for (let a = 0; a < N_ACTIONS; a++) {
+    qctx.fillStyle = "rgba(180,185,200,0.8)";
+    qctx.fillText(cols[a], labelW + a * cw + cw / 2 - 11, headH / 2);
+  }
+  for (let s = 0; s < N_STATES; s++) {
+    const y = headH + s * ch;
+    const cur = (s === eagle.curState);
+    // 该状态下的贪心动作(顶部亮线), 一眼看出"学会了什么"。
+    // 若第一名与第二名差距 <5%, 亮线画成半透明 —— 表示"还没学出偏好",
+    // 免得用户以为热力图在闪就是坏了(雁近行常年就是这种势均力敌)。
+    let ga = 0, gb = -1;
+    for (let a = 1; a < N_ACTIONS; a++) {
+      const v = eagle.Q[s * N_ACTIONS + a], cur2 = eagle.Q[s * N_ACTIONS + ga];
+      if (v > cur2) { gb = ga; ga = a; } else if (a !== ga && (gb < 0 || v > eagle.Q[s * N_ACTIONS + gb])) gb = a;
+    }
+    const best = eagle.Q[s * N_ACTIONS + ga];
+    const second = gb >= 0 ? eagle.Q[s * N_ACTIONS + gb] : -Infinity;
+    const tie = !(best > second) || (best - second) < 0.05 * Math.max(maxQ, 1e-6);
+    const hasValue = maxQ > 1e-6 && best > 1e-6;
+    qctx.fillStyle = cur ? "rgba(255,220,140,0.95)" : "rgba(150,155,170,0.65)";
+    qctx.fillText(rows[s], 2, y + ch / 2);
+    for (let a = 0; a < N_ACTIONS; a++) {
+      const x = labelW + a * cw;
+      const v = Math.max(0, eagle.Q[s * N_ACTIONS + a]) / maxQ;   // 0..1 亮度
+      qctx.fillStyle = `hsl(${210 - 165 * v}, ${35 + 40 * v}%, ${10 + 38 * v}%)`;
+      qctx.fillRect(x + 1, y + 1, cw - 2, ch - 2);
+      if (s !== STATE_NONE && hasValue) {                    // 贪心动作: 顶部一条亮线
+        if (a === ga) {
+          qctx.fillStyle = tie ? "rgba(255,235,170,0.35)" : "rgba(255,235,170,0.9)";
+          qctx.fillRect(x + 3, y + 2, cw - 6, 1.5);
+        }
+      }
+      if (cur && a === eagle.curAction) {                    // 当前决策高亮
+        qctx.strokeStyle = "rgba(255,255,255,0.95)";
+        qctx.lineWidth = 1.5;
+        qctx.strokeRect(x + 1.5, y + 1.5, cw - 3, ch - 3);
+      }
+    }
+  }
+}
+
+/* --------------------- 8. 计分板 / 控件 / 主循环 --------------------- */
+
+const el = id => document.getElementById(id);
+
+/* ---- 状态栏可收起: 按钮或快捷键 H 切换, 尽量记住上次状态 ---- */
+const PANEL_KEY = "boids.panelCollapsed";
+let panelHidden = false;
+function setPanelHidden(hide, persist) {
+  panelHidden = !!hide;
+  const p = el("panel");
+  if (p && p.classList) p.classList.toggle("collapsed", panelHidden);
+  const b = el("btnHide");
+  if (b) b.textContent = panelHidden ? "展开 ◂" : "收起 ▸";
+  if (persist) {
+    try { localStorage.setItem(PANEL_KEY, panelHidden ? "1" : "0"); } catch (e) { /* file:// 下可能不可用 */ }
+  }
+}
+el("btnHide").onclick = () => setPanelHidden(!panelHidden, true);
+try { if (localStorage.getItem(PANEL_KEY) === "1") setPanelHidden(true, false); } catch (e) { /* 忽略 */ }
+
+function refreshPanel() {
+  el("s0").textContent = falcons[0].score;
+  el("s1").textContent = falcons[1] ? falcons[1].score : "—";
+  const E0 = eagles[0] || null;                // 第 8 轮: 鹰可减到 0, 面板留空显示
+  el("s2").textContent = E0 ? E0.score : "—";
+  el("k0").textContent = falcons[0].kills;
+  el("k1").textContent = falcons[1] ? falcons[1].kills : "—";
+  el("k2").textContent = E0 ? E0.kills : "—";
+  el("aliveS").textContent = aliveCount;
+  el("aliveG").textContent = galiveCount;
+  refreshRaidLine();                           // 第 7 轮: 增援编制与战果
+
+  const ds = E0 ? E0.dietStarling : 0, dg = E0 ? E0.dietGoose : 0, tot = ds + dg;
+  el("dietS").style.width = (tot ? ds / tot * 100 : 50) + "%";
+  el("dietG").style.width = (tot ? dg / tot * 100 : 50) + "%";
+  el("dietText").textContent = tot
+    ? `椋鸟 ${ds} 只 · 雁 ${dg} 只 · 当前偏向 ${dg >= ds ? "追雁（大分）" : "追椋鸟（好抓）"}`
+    : "还没开张";
+
+  const secs = stats.steps / 60;
+  el("fpsLine").innerHTML =
+    `FPS ${fpsEma.toFixed(0)} · 模拟 ${secs.toFixed(0)}s · 总捕获 ${stats.kills}` +
+    `（${(stats.kills / Math.max(secs, 1) * 60).toFixed(1)}/分）· 补充 ${stats.wave} 波 · ε=${E0 ? E0.eps.toFixed(2) : "—"}<br>` +
+    `渲染 ${VIEW3D ? (gl3dReady ? "WebGL·3D" : "软渲染·3D") : (glReady ? "WebGL" : "Canvas2D")}${want2D ? "(强制)" : ""}` +
+    ` · 视角 ${VIEW3D ? "三维" : "俯视"}${GRAV_ON ? " · 重力" : ""} · step ${perf.stepMs.toFixed(1)}ms · render ${perf.renderMs.toFixed(2)}ms` +
+    (gpuCompute
+      ? ` · 计算 WebGPU(上行 ${perf.uploadMs.toFixed(1)} + GPU ${perf.gpuMs.toFixed(1)} + 回读 ${perf.readbackMs.toFixed(1)} ms)`
+      : ` · 计算 CPU${computeMode === "cpu" ? "(强制)" : ""}`) + `<br>` +
+    `空冲刺 ${stats.missFalcon}+${stats.missEagle} · 突围打断 ${stats.mobInterrupts} · ` +
+    `锁定冲刺 ${stats.lockedDashes} · 无目标放弃 ${stats.noLockAborts} · 互攻 ${stats.clashes}（抢分 ${stats.steals}）<br>` +
+    `雁: 领队 #${leaderIdx} · 混乱 ${disarray} · 幼雁 ${juvenileAlive()}/${juvCount}` +
+    `${gooseDebuff > 0 ? " (沮丧 " + gooseDebuff + ")" : ""} · 借网预警 ${stats.gooseAlerts}（误报 ${stats.gooseFalseAlerts}）· 斩首 ${stats.gooseDisarray}<br>` +
+    `隼策: 代数 ${falcons[0].policy.gen}/${falcons[1].policy.gen} · 锥内失血 ${stats.coneFalconFrames}+${stats.coneEagleDrain} · ES 采纳 ${stats.esAdopt}/${stats.esPeriods} 期`;
+  el("modeTag").textContent = TORUS ? "环面" : "开阔世界";
+  renderQ();
+}
+
+// P2: 还活着几只幼雁
+function juvenileAlive() {
+  let c = 0;
+  for (let i = 0; i < M; i++) if (galive[i] && isJuvenile(i)) c++;
+  return c;
+}
+
+// P3: 把两只隼的策略打回出厂设置(评估期/代数/适应度一起归零)
+function resetFalconPolicies() {
+  for (const f of falcons) {
+    f.policy = makePolicy();
+    f.policy.score0 = f.score;
+  }
+  stats.esAdopt = 0; stats.esPeriods = 0;
+}
+
+el("btnFlocks").onclick = () => resetFlocks();          // 重置鸟群(计分保留)
+el("btnPreds").onclick  = () => resetPredators();       // 重置猛禽 = 回到默认编制(2 隼 + 1 鹰)
+el("btnAddFalcon").onclick = () => spawnRaptor("falcon");   // 第 7/8 轮: 立即增援一只隼
+el("btnAddEagle").onclick  = () => spawnRaptor("eagle");    // 第 7/8 轮: 立即增援一只鹰(独立 Q 表)
+el("btnFMinus").onclick = () => removeRaptor("falcon");     // 第 8 轮: 一键增减编制
+el("btnFPlus").onclick  = () => spawnRaptor("falcon");
+el("btnEMinus").onclick = () => removeRaptor("eagle");
+el("btnEPlus").onclick  = () => spawnRaptor("eagle");
+el("btnView").onclick = () => toggleView();
+el("btnCamReset").onclick = () => { cam.yaw = 0.7; cam.pitch = 0.52; cam.dist = 950; };
+el("cbGravity").onchange = e => { GRAV_ON = e.target.checked; };
+el("cbAuto").onchange = e => { cam.auto = e.target.checked; };
+/* 增援行: 显示当前猛禽编制与增援者的合计战果 */
+function refreshRaidLine() {
+  const nf = falcons.length, ne = eagles.length;
+  let extraK = 0, extraS = 0;
+  for (let i = 2; i < falcons.length; i++) { extraK += falcons[i].kills; extraS += falcons[i].score; }
+  for (let i = 1; i < eagles.length; i++)  { extraK += eagles[i].kills;  extraS += eagles[i].score; }
+  const base = `猛禽编制: 隼 ×${nf} · 鹰 ×${ne}`;
+  el("raidLine").textContent = (nf > 2 || ne > 1)
+    ? base + `（增援 ${nf - 2 + ne - 1} 只: 捕获 ${extraK} · 得分 ${extraS}）`
+    : base;
+}
+el("btnScore").onclick  = () => {                       // 清空计分
+  for (const f of falcons) { f.score = 0; f.kills = 0; f.dashEats = 0; }
+  for (const E of eagles) { E.score = 0; E.kills = 0; E.dashEats = 0; E.dietStarling = 0; E.dietGoose = 0; }
+  stats.kills = 0; stats.steps = 0; stats.wave = 0;
+  stats.missFalcon = 0; stats.missEagle = 0; stats.mobInterrupts = 0;
+  stats.lockedDashes = 0; stats.clashes = 0; stats.steals = 0;
+};
+el("btnBrain").onclick = () => {                        // 重置鹰脑(所有鹰的 Q 表一起清)
+  for (const E of eagles) {
+    E.Q.fill(0);
+    E.eps = EPS0;
+    E.lastState = 0; E.lastAction = 0; E.pending = 0;
+    E.dietStarling = 0; E.dietGoose = 0;
+    E.curState = STATE_NONE; E.curAction = 2;
+    E.hold = 0; E.holdState = STATE_NONE; E.holdAction = 2;
+  }
+};
+el("btnPolicy").onclick = () => resetFalconPolicies();  // P3: 重置隼策(回默认参数)
+el("btnPause").onclick = () => {
+  paused = !paused;
+  el("btnPause").textContent = paused ? "继续（空格）" : "暂停（空格）";
+  el("btnPause").classList.toggle("on", paused);
+};
+el("cbVision").onchange = e => showVision = e.target.checked;
+el("cbForm").onchange   = e => showFormation = e.target.checked;
+el("cbRefill").onchange = e => refillOn = e.target.checked;
+el("cbTorus").onchange  = e => setGeometry(e.target.checked);
+el("rgN").oninput    = e => el("vN").textContent = e.target.value;
+el("rgN").onchange   = e => setN(+e.target.value);
+el("rgK").oninput    = e => { topoK = clamp(+e.target.value, 1, TOPO_MAX); el("vK").textContent = topoK; };
+el("rgSpeed").oninput = e => { speedMul = +e.target.value; el("vSpeed").textContent = speedMul + "×"; };
+
+document.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (k === " ") { e.preventDefault(); el("btnPause").onclick(); }
+  else if (k === "h") setPanelHidden(!panelHidden, true);   // 收起/展开状态栏
+  else if (k === "r") resetFlocks();
+  else if (k === "c") el("btnScore").onclick();
+  else if (k === "f") { if (e.shiftKey) el("btnFMinus").onclick(); else el("btnAddFalcon").onclick(); }   // 第 8 轮: ⇧F 减员
+  else if (k === "e") { if (e.shiftKey) el("btnEMinus").onclick(); else el("btnAddEagle").onclick(); }     // 第 8 轮: ⇧E 减员
+  else if (k === "t") toggleView();                     // 第 8 轮: 3D/俯视切换
+  else if (k === "b") el("btnBrain").onclick();
+  else if (k === "v") { el("cbVision").checked = !el("cbVision").checked; showVision = el("cbVision").checked; }
+});
+
+/* ---- GPU 计算路径(第 1 步原型): 6.1+6.2 在 GPU, 其余仍走 stepRest ---- */
+async function stepGPU() {
+  frame++; stats.steps++;
+  const tor = TORUS;
+  const r = await window.ComputeBackend.frame(computeScene);   // GPU: 网格 + 邻居 + 求力 -> ACC
+  perf.uploadMs = perf.uploadMs * 0.9 + r.uploadMs * 0.1;
+  perf.gpuMs = perf.gpuMs * 0.9 + r.gpuMs * 0.1;
+  perf.readbackMs = perf.readbackMs * 0.9 + r.readbackMs * 0.1;
+  cpuCentroidOnly(tor);                                       // 6.3/6.4 需要质心(与 CPU 版同序)
+  stepRest(tor);                                              // 6.3 ~ 6.10
+  return r;
+}
+
+let stepAcc = 0;
+function loop() {
+  const now = performance.now();
+  fpsEma = fpsEma * 0.95 + (1000 / Math.max(now - lastT, 1)) * 0.05;
+  lastT = now;
+  tryInitGL();                                 // 首帧再初始化 GL(那时第二个 script 已解析)
+
+  let stepMs = 0;
+  if (!paused) {
+    const t0 = performance.now();
+    stepAcc += speedMul;                       // 时间倍速: 一帧跑多步
+    const nSteps = Math.min(Math.floor(stepAcc), 4);
+    stepAcc -= nSteps;
+    for (let s = 0; s < nSteps; s++) step();
+    stepMs = (performance.now() - t0) / Math.max(nSteps, 1);   // 单步耗时(除以步数)
+  }
+  perf.stepMs = perf.stepMs * 0.9 + stepMs * 0.1;
+  render();
+
+  if (now - lastPanelT > 160) {                // 计分板 ~6Hz 刷新足够
+    lastPanelT = now;
+    refreshPanel();
+    if (diagMode && (++diagTicks % 6 === 0)) {  // ~1 秒一行, 给无头/真机取证用
+      console.info("DIAG " + JSON.stringify({
+        backend: gpuCompute ? "webgpu" : "cpu", n: N, frame,
+        fps: Math.round(fpsEma), stepMs: +perf.stepMs.toFixed(2), renderMs: +perf.renderMs.toFixed(2),
+        uploadMs: +perf.uploadMs.toFixed(2), gpuMs: +perf.gpuMs.toFixed(2), readbackMs: +perf.readbackMs.toFixed(2),
+        alive: aliveCount, galive: galiveCount, kills: stats.kills, deaths: stats.steps,
+      }));
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+/* GPU 帧循环: 每帧 await 计算后端(WebGPU 提交是异步的, 主线程不能阻塞等待,
+ * 所以 GPU 模式下整条循环变成 async —— 每帧仍然只推进一次物理, 语义与 CPU 路径一致) */
+let gpuFrameBusy = false;
+async function loopGPU() {
+  if (gpuFrameBusy) { requestAnimationFrame(loopGPU); return; }   // 防重入(一帧一个 await)
+  gpuFrameBusy = true;
+  const now = performance.now();
+  fpsEma = fpsEma * 0.95 + (1000 / Math.max(now - lastT, 1)) * 0.05;
+  lastT = now;
+  tryInitGL();
+
+  let stepMs = 0;
+  if (!paused && window.ComputeBackend && window.ComputeBackend.ready()) {
+    const t0 = performance.now();
+    stepAcc += speedMul;
+    const nSteps = Math.min(Math.floor(stepAcc), 4);
+    stepAcc -= nSteps;
+    for (let s = 0; s < nSteps; s++) {
+      try { await stepGPU(); }
+      catch (e) {                                  // 任何一次失败都当场降级, 不让画面停住
+        console.warn("WebGPU 计算失败, 退回 CPU 路径:", e && e.message);
+        gpuCompute = false; perf.gl = perf.gl; computeMode = "cpu";
+        step(); break;
+      }
+    }
+    stepMs = (performance.now() - t0) / Math.max(nSteps, 1);
+  } else if (!paused) {
+    const t0 = performance.now();
+    step();
+    stepMs = performance.now() - t0;
+  }
+  perf.stepMs = perf.stepMs * 0.9 + stepMs * 0.1;
+  render();
+  if (now - lastPanelT > 160) {
+    lastPanelT = now;
+    refreshPanel();
+    if (diagMode && (++diagTicks % 6 === 0)) {
+      console.info("DIAG " + JSON.stringify({
+        backend: gpuCompute ? "webgpu" : "cpu", n: N, frame,
+        fps: Math.round(fpsEma), stepMs: +perf.stepMs.toFixed(2), renderMs: +perf.renderMs.toFixed(2),
+        uploadMs: +perf.uploadMs.toFixed(2), gpuMs: +perf.gpuMs.toFixed(2), readbackMs: +perf.readbackMs.toFixed(2),
+        alive: aliveCount, galive: galiveCount, kills: stats.kills, deaths: stats.steps,
+      }));
+    }
+  }
+  gpuFrameBusy = false;
+  requestAnimationFrame(gpuCompute ? loopGPU : loop);
+}
+
+/* ---- 启动 ---- */
+recomputeGridSize();
+resetFlocks();
+resetPredators();
+
+/* 启动闸门: compute=cpu 直接起 CPU 循环; 否则先试 WebGPU(含自检), 失败静默回退。
+ * 【必须排到首帧再跑】: 本函数在主区块求值时会同步执行, 而 WebGPU 后端在第三个
+ * <script> 区块里, 那时还没被解析 —— 直接查 window.ComputeBackend 会永远拿到
+ * undefined, auto 模式就永远退回 CPU(真机浏览器实测踩到的坑)。 */
+requestAnimationFrame(async function boot() {
+  if (computeMode === "cpu") { requestAnimationFrame(loop); return; }
+  const B = window.ComputeBackend;
+  if (!B) {
+    console.warn("WebGPU 计算后端脚本缺失, 走 CPU 路径");
+    requestAnimationFrame(loop); return;
+  }
+  // 初始化带超时: requestAdapter 万一卡住也不能让画面不启动(默认 3 秒, ?initTimeout=ms 可调)
+  const ok = await Promise.race([
+    B.init(computeScene),
+    new Promise(res => setTimeout(() => res("timeout"), initTimeoutMs)),
+  ]);
+  if (ok === "timeout") {
+    console.warn("WebGPU 初始化超时(" + initTimeoutMs + "ms), 先按 CPU 路径起步");
+    requestAnimationFrame(loop); return;
+  }
+  computeInitInfo = B.info();  if (!ok) {
+    if (computeMode === "gpu") console.warn("compute=gpu 但 WebGPU 不可用:", computeInitInfo.reason, "-> 回退 CPU");
+    else console.info("WebGPU 不可用(" + computeInitInfo.reason + "), 走 CPU 路径");
+    requestAnimationFrame(loop); return;
+  }
+  // 自检: 同一状态比 CPU/GPU 的 ACC, 超差就退回 CPU
+  computeSelfCheck = await B.selfCheck(computeScene, computeScene.cpuForces);
+  if (!computeSelfCheck.passed) {
+    console.warn("WebGPU 自检未通过(maxAbs=" + computeSelfCheck.maxAbs.toExponential(2) +
+                 ", 超差 " + computeSelfCheck.bad + " 项), 退回 CPU 路径");
+    B.dispose();
+    requestAnimationFrame(loop); return;
+  }
+  gpuCompute = true;
+  console.info("WebGPU 计算启用: 6.1+6.2 上 GPU, 自检通过(maxAbs=" +
+               computeSelfCheck.maxAbs.toExponential(2) + ")");
+  requestAnimationFrame(loopGPU);
+});
+
+/* ---- 第二个 <script> 里的 WebGL 后端: 延迟到第一帧再初始化(那时它已解析完) ---- */
+function tryInitGL() {
+  if (glTried) return;
+  glTried = true;
+  if (want2D) { console.info("render=2d: 走 Canvas2D 全路径(用于 A/B 对比)"); return; }
+  const B = window.GLBackend;
+  if (!B) { console.warn("WebGL 后端脚本缺失, 回退 Canvas2D"); return; }
+  const ok = B.init(glScene, document.getElementById("glcv"), forceGL);
+  glReady = !!ok;
+  gl3dReady = glReady && !!(B.has3D && B.has3D());   // 第 8 轮: 3D 管线随 2D 一起初始化
+  perf.gl = glReady;
+  if (!ok) console.warn("WebGL 不可用, 回退 Canvas2D 全路径");
+  else {
+    const gi = B.info();
+    console.info("WebGL 实例化渲染已启用: " + (gi && gi.gl2 ? "WebGL2" : "WebGL1+ANGLE") +
+                 " · " + (gi ? gi.renderer : "?") + " · 最多 " + (gi ? gi.maxN : "?") + " 只实例");
+  }
+}
+
+/* ---- 调试/自动化钩子(浏览器控制台或 headless 校验脚本可用) ---- */
+window.SIM = {
+  step, render, initStarlings, initGeese, resetFlocks, resetPredators, setGeometry, setN, perceive, refreshPanel,
+  setPanelHidden,
+  get panelHidden() { return panelHidden; },
+  get N() { return N; },
+  get M() { return M; },
+  get frame() { return frame; },
+  get TORUS() { return TORUS; },
+  get PAD() { return PAD; },
+  get aliveCount() { return aliveCount; },
+  get galiveCount() { return galiveCount; },
+  get scores() { return [falcons[0].score, falcons[1] ? falcons[1].score : 0, eagles[0] ? eagles[0].score : 0]; },
+  get kills() { return [falcons[0].kills, falcons[1] ? falcons[1].kills : 0, eagles[0] ? eagles[0].kills : 0]; },
+  get diet() { return [eagles[0] ? eagles[0].dietStarling : 0, eagles[0] ? eagles[0].dietGoose : 0]; },
+  get stats() { return stats; },
+  get Q() { return eagles[0] ? eagles[0].Q : new Float32Array(N_STATES * N_ACTIONS); },
+  get eps() { return eagles[0] ? eagles[0].eps : 0; },
+  get maxSpeed() { return MAX_SPEED; },
+  get maxSpeedG() { return MAX_SPEED_G; },
+  get leaderSpeed() { return LEADER_SPEED; },
+  get leader() { return { x: Lx, y: Ly, ang: leaderAng, z: Z2[leaderIdx] }; },
+  get topoK() { return topoK; },
+  setTopoK(v) { topoK = clamp(v | 0, 1, TOPO_MAX); },
+  setRefill(v) { refillOn = !!v; },
+  setSpeed(v) { speedMul = v; },
+  setPaused(v) { paused = !!v; },
+  get hunterMob() { return [falcons[0].mob, falcons[1].mob, eagle.mob]; },
+  get hunterStun() { return [falcons[0].stun, falcons[1].stun, eagle.stun]; },
+  get hunterLock() { return [falcons[0].lockIdx, falcons[1].lockIdx, eagle.lockIdx]; },
+  get eatR2() { return [EAT_R2_S, EAT_R2_G]; },
+  get flockConsts() { return { PERCEPTION, COHESION_W, ALIGNMENT_W, MAX_FORCE, SEP_R2 }; },
+  get mobConsts() { return { MOB_FRACTION, MOB_R, MOB_HARASS, MOB_MAX, MOB_DRAIN_PER, MOB_PENALTY_N }; },
+  get mobberCount() { let c = 0; for (let i = 0; i < N; i++) if (alive[i] && isMobber[i]) c++; return c; },
+  get actionCols() { return N_ACTIONS; },
+  // 第 7 轮: 个体体积与间距(验收/回归用), 以及"加入鹰/隼"的编程接口
+  get bodySizes() { return { starling: BODY_S.slice(), goose: BODY_G.slice(), falcon: BODY_F.slice(), eagle: BODY_E.slice() }; },
+  get spacing() { return { PERCEPTION, SEP_R2, GSEP_R2, CELL }; },
+  get raptorCount() { return { falcons: falcons.length, eagles: eagles.length, total: raptors.length }; },
+  get raidKills() { return raptors.map(r => r.kills); },
+  addFalcon: () => spawnRaptor("falcon"),
+  addEagle: () => spawnRaptor("eagle"),
+  get raidLine() { return el("raidLine").textContent; },
+  get maxN() { return MAXN; },
+  get gw() { return GW; },
+  get gh() { return GH; },
+  // 性能: 每帧指数滑动平均(渲染后端验收用)
+  get perf() { return { stepMs: perf.stepMs, renderMs: perf.renderMs, gl: perf.gl,
+                        uploadMs: perf.uploadMs, gpuMs: perf.gpuMs, readbackMs: perf.readbackMs }; },
+  // WebGPU 计算后端(第 6 轮 Phase 1+2B 原型): 状态 / 自检结果 / 手动切换与手动一帧
+  get compute() {
+    return {
+      requested: computeMode,
+      backend: gpuCompute ? "webgpu" : "cpu",
+      init: computeInitInfo,
+      selfCheck: computeSelfCheck,
+      ready: !!(window.ComputeBackend && window.ComputeBackend.ready()),
+      info: window.ComputeBackend ? window.ComputeBackend.info() : null,
+    };
+  },
+  accView: () => ACC,                            // 调试/验收: 直接看 CPU 侧 ACC(自检对拍用)
+  computeSceneRef: () => computeScene,
+  async setCompute(mode) {                       // "cpu" | "gpu" | "auto": 立即尝试切换
+    computeMode = mode;
+    if (mode === "cpu") { gpuCompute = false; return { backend: "cpu" }; }
+    const B = window.ComputeBackend;
+    if (!B) return { backend: "cpu", reason: "后端脚本缺失" };
+    if (!B.ready()) {
+      const ok = await B.init(computeScene);
+      computeInitInfo = B.info();
+      if (!ok) return { backend: "cpu", reason: computeInitInfo.reason };
+    }
+    computeSelfCheck = await B.selfCheck(computeScene, computeScene.cpuForces);
+    if (!computeSelfCheck.passed) { gpuCompute = false; return { backend: "cpu", selfCheck: computeSelfCheck }; }
+    gpuCompute = true;
+    return { backend: "webgpu", selfCheck: computeSelfCheck };
+  },
+  async selfCheckNow() {                         // 浏览器里手动复跑一次自检
+    const B = window.ComputeBackend;
+    if (!B || !B.ready()) return null;
+    computeSelfCheck = await B.selfCheck(computeScene, computeScene.cpuForces);
+    return computeSelfCheck;
+  },
+  async stepGPUOnce() {                          // 手动跑一帧 GPU 路径(调试)
+    if (!window.ComputeBackend || !window.ComputeBackend.ready()) return null;
+    const t0 = performance.now();
+    await stepGPU();
+    return { ms: performance.now() - t0, gpuMs: perf.gpuMs, uploadMs: perf.uploadMs, readbackMs: perf.readbackMs };
+  },
+  /* 浏览器侧测速: 连跑 frames 帧 GPU 路径, 返回整体 step 与三段(上行/GPU/回读)的中位数。
+   * 用法(控制台): await SIM.benchGPU(120) */
+  async benchGPU(frames) {
+    if (!window.ComputeBackend || !window.ComputeBackend.ready()) return { error: "WebGPU 未就绪: " + (computeInitInfo && computeInitInfo.reason) };
+    const f = frames || 120;
+    const tot = [], up = [], gp = [], rd = [];
+    for (let i = 0; i < f; i++) {
+      const t0 = performance.now();
+      const r = await stepGPU();
+      tot.push(performance.now() - t0); up.push(r.uploadMs); gp.push(r.gpuMs); rd.push(r.readbackMs);
+    }
+    const med = a => { a = Array.from(a).sort((x, y) => x - y); return a[a.length >> 1]; };
+    return { frames: f, n: N, stepMs: med(tot), uploadMs: med(up), gpuMs: med(gp), readbackMs: med(rd),
+             cpuRestMs: med(tot) - med(up) - med(gp) - med(rd) };
+  },
+  get renderBackend() { return glReady ? "webgl" : (want2D ? "2d(forced)" : "2d(fallback)"); },
+  initRenderBackend: () => { tryInitGL(); return glReady; },
+  get glInfo() { return window.GLBackend ? window.GLBackend.info() : null; },
+  // P2: 雁群中心化状态(验收判据 4/5/6 用)
+  get geeseInfo() {
+    return { leaderIdx, shift: gooseShift, disarray, debuff: gooseDebuff,
+             juvenileAlive: juvenileAlive(), juvenileTotal: juvCount,
+             apexAlive: !!galive[leaderIdx], galiveCount,
+             apexX: Lx, apexY: Ly, leaderAng,
+             alerts: stats.gooseAlerts, falseAlerts: stats.gooseFalseAlerts,
+             disarrayCount: stats.gooseDisarray };
+  },
+  // P3: 两只隼的策略参数(实际值)与上一期适应度
+  get falconPolicies() {
+    return falcons.map((f, k) => {
+      const v = policyVals({ policy: { evalP: f.policy.p } });
+      return { id: k, normalized: Array.from(f.policy.p), vals: v,
+               gen: f.policy.gen, periods: f.policy.periods,
+               baseFit: f.policy.baseFit, lastFit: f.policy.lastFit,
+               isCand: f.policy.isCand, score: f.score };
+    });
+  },
+  resetFalconPolicies,
+  killGoose: gooseDies,                    // 调试/验收: 手动干掉一只雁(走真实死亡流程)
+  slotOf: i => (i + gooseShift) % M,
+  slotRankArm: i => ({ rank: slotRank[(i + gooseShift) % M], arm: slotArm[(i + gooseShift) % M] }),
+  isJuvenile,
+  get esConst() { return { ES_EVAL_FRAMES, ES_SIGMA, ES_MISS_WEIGHT, ES_METAB_WEIGHT, ES_NP }; },
+  setEvalFrames(v) { esEvalOverride = v; },
+  // ---- 任务0: 一次性物理基准(浏览器控制台或 headless 都用这一个入口) ----
+  // 用法: SIM.bench()  或  SIM.bench(300, [2000,5000,10000,20000])
+  // 返回每档的每帧 step 耗时分布(只调 step(), 完全不碰 render)
+  bench(steps, ns) {
+    const list = ns && ns.length ? ns : [2000, 5000, 10000, 20000];
+    const out = [];
+    const keepN = N;
+    for (const n of list) {
+      setN(n);
+      for (let i = 0; i < 30; i++) step();            // 预热(让 JIT 稳定)
+      const times = new Float64Array(steps);
+      for (let i = 0; i < steps; i++) {
+        const t0 = performance.now();
+        step();
+        times[i] = performance.now() - t0;
+      }
+      const sorted = Array.from(times).sort((a, b) => a - b);
+      const med = sorted[steps >> 1];
+      const p90 = sorted[Math.min(steps - 1, Math.floor(steps * 0.9))];
+      const p99 = sorted[Math.min(steps - 1, Math.floor(steps * 0.99))];
+      const mean = sorted.reduce((a, b) => a + b, 0) / steps;
+      out.push({ n, steps, median: +med.toFixed(3), p90: +p90.toFixed(3), p99: +p99.toFixed(3),
+                 mean: +mean.toFixed(3), min: +sorted[0].toFixed(3) });
+    }
+    setN(keepN);
+    return out;
+  },
+  // P1: 采样目标获取的直接入口(调试/验收用)
+  probe: (x, y, vx, vy, r) => perceive(x, y, vx, vy, r * r),
+  inCone,
+  // P4: 惊飞网规模(雁能"看到"多少条预警)
+  get startledCount() { let c = 0; for (let i = 0; i < N; i++) if (alive[i] && startled[i]) c++; return c; },
+  get startledRatio() { return aliveCount ? this.startledCount / aliveCount : 0; },
+  get pvConst() { return { PV_ALERT_COS, ALERT_R, ALERT_N, ALERT_FALSE_R }; },
+  get samplingConst() { return { radii: SAMPLE_RADII.slice(), angles: SAMPLE_ANGLES, SCOOP_R, LOCK_R, DIR_LAG }; },
+  // 验收用: 把三只猛禽挪到远角(可每帧调用, 模拟"无猛禽干扰"的鸟群)
+  parkRaptors(x = -PAD - 40, y = -PAD - 40) {
+    for (const r of raptors) {
+      r.x = wrapX(x); r.y = wrapY(y); r.vx = 0; r.vy = 0;
+      r.dashT = 0; r.energy = ENERGY_MAX; r.memT = -1e9; r.seeing = false;
+    }
+  },
+  starling(i) { return { x: P[2*i], y: P[2*i+1], z: Z[i], vx: V[2*i], vy: V[2*i+1], vz: VZ[i], alive: !!alive[i], mobber: !!isMobber[i] }; },
+  goose(i) { return { x: P2[2*i], y: P2[2*i+1], z: Z2[i], alive: !!galive[i] }; },
+  hunter(i) {
+    const h = raptors[i];
+    return { x: h.x, y: h.y, z: h.z, vx: h.vx, vy: h.vy, vz: h.vz || 0, energy: h.energy || 0, dashT: h.dashT || 0,
+             mob: h.mob || 0, stun: h.stun || 0, lockIdx: h.lockIdx === undefined ? -1 : h.lockIdx,
+             score: h.score, dashEats: h.dashEats || 0 };
+  },
+  // 第 8 轮: 视角/重力/减员 编程接口
+  get view3D() { return VIEW3D; },
+  setView3D(v) { if (!!v !== VIEW3D) toggleView(); },
+  get gravity() { return GRAV_ON; },
+  setGravity(v) { GRAV_ON = !!v; const cb = el("cbGravity"); if (cb) cb.checked = GRAV_ON; },
+  removeFalcon: () => removeRaptor("falcon"),
+  removeEagle: () => removeRaptor("eagle"),
+  get corpses() { let c = 0; for (let k = 0; k < CORPSE_CAP; k++) if (cT[k] > 0) c++; return c; },
+  cam,
+};
+</script>
+<script>
+"use strict";
+/* ============================================================================
+ * WebGL 渲染后端(任务 2) —— 全部 GL 代码集中在本 <script> 区块, 零依赖
+ * ----------------------------------------------------------------------------
+ * 分工: 本区块只画"数量随 N 增长"的东西 —— 椋鸟 / 雁(实例化) + 拖尾残影;
+ *       猛禽/标签/能量条/死亡涟漪/小地图/视野圈/配合轴线/威慑锥这些数量 <= 10 的
+ *       实体仍由主区块的 2D 叠加层绘制(Canvas2D 完全够用, 不值得进 WebGL)。
+ *
+ * 每帧管线(api.draw):
+ *   ① 残影淡出: 把上一帧纹理 prev 用 fade 片元着色器画进当前 fboCur
+ *        outColor.rgb = prev.rgb * (1 - FADE) + BG * FADE     (FADE = 0.16)
+ *      与旧版每帧 ctx.fillRect(0,0,W,H) + rgba(10,12,18,0.16) 数学等价。
+ *   ② 两批实例化: 同一个单位 ">" 几何(两个三角形 = 6 顶点), 两次 drawArraysInstanced
+ *        椋鸟 instanceCount = aliveCount, 颜色 rgb(200,215,235), 形状 (2.2,1.4,1.4)
+ *        雁   instanceCount = galiveCount, 颜色 rgb(255,200,110), 形状 (3.2,1.8,2.0)
+ *      实例属性 = (x, y, angle) 三个 float, 每帧 bufferSubData 只传活着的那些;
+ *      旋转(uShape 缩放 + cos/sin)与投影(y 翻转)全在顶点着色器里, CPU 只算 angle。
+ *      顶点(单位空间): 鼻尖(+1, 0), 左右翼各 (+/-1 侧)两个顶点, 翼端厚 ±0.28,
+ *      向鼻尖收成尖 —— 视觉上等价于原来 drawArrow 描出来的 ">"。
+ *   ③ 拷到默认帧缓冲(叠加层 canvas 覆盖在它上面)。
+ *   ④ prev / cur 两张纹理 ping-pong 交换; preserveDrawingBuffer = false。
+ * ========================================================================== */
+(function () {
+  let gl = null, isGL2 = false, canvas = null, scene = null, angleExt = null;
+  let progFade = null, progBird = null;
+  let quadVBO = null, birdVBO = null, instVBO = null;
+  let texA = null, texB = null, fboA = null, fboB = null, curIsA = true;
+  let starBuf = null, gooseBuf = null, maxN = 0, maxM = 0;
+  // 第 8 轮: 3D 管线(透视 + 深度 + 雾; 仅 WebGL2)
+  let prog3 = null, instVBO3 = null, star3Buf = null, goose3Buf = null;
+  let tex3 = null, fbo3 = null, depth3 = null, has3DFlag = false;
+  const U3 = {}, A3 = {};
+  const U = {}, A = {};
+
+  /* ---- 着色器源码(GL2 用 #version 300 es + in/out, GL1 用 attribute/varying) ---- */
+  const VS_BIRD = `#version 300 es
+  in vec2 aUnit;                 // 单位 ">" 的 6 个顶点
+  in vec3 aInst;                 // 实例属性: (x, y, angle)
+  uniform vec2 uRes;             // 视口尺寸(世界坐标 1:1 像素)
+  uniform vec3 uShape;           // (尖端长, 尾长, 翼展) —— 与 drawArrow 参数一致
+  void main() {
+    // 单位形状 -> 按形状参数放大: aUnit.x > 0 是鼻尖(前伸 uShape.x), 否则尾部(-uShape.y)
+    vec2 p = vec2(aUnit.x > 0.0 ? uShape.x : -uShape.y, aUnit.y * uShape.z);
+    float ca = cos(aInst.z), sa = sin(aInst.z);          // 旋转在这里做
+    vec2 w = vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca) + aInst.xy;
+    // 世界坐标(原点左上) -> 裁剪空间: y 翻转用投影矩阵式的一行, 不逐顶点翻
+    gl_Position = vec4(w.x / uRes.x * 2.0 - 1.0, 1.0 - w.y / uRes.y * 2.0, 0.0, 1.0);
+  }`;
+  const FS_BIRD = `#version 300 es
+  precision mediump float;
+  uniform vec3 uColor;
+  out vec4 outColor;
+  void main() { outColor = vec4(uColor, 1.0); }`;
+  const VS_BIRD1 = `
+  attribute vec2 aUnit; attribute vec3 aInst;
+  uniform vec2 uRes; uniform vec3 uShape;
+  void main() {
+    vec2 p = vec2(aUnit.x > 0.0 ? uShape.x : -uShape.y, aUnit.y * uShape.z);
+    float ca = cos(aInst.z), sa = sin(aInst.z);
+    vec2 w = vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca) + aInst.xy;
+    gl_Position = vec4(w.x / uRes.x * 2.0 - 1.0, 1.0 - w.y / uRes.y * 2.0, 0.0, 1.0);
+  }`;
+  const FS_BIRD1 = `
+  precision mediump float; uniform vec3 uColor;
+  void main() { gl_FragColor = vec4(uColor, 1.0); }`;
+
+  const VS_QUAD = `#version 300 es
+  in vec2 aPos; out vec2 vUV;
+  void main() { vUV = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+  const FS_QUAD = `#version 300 es
+  precision mediump float;
+  in vec2 vUV;
+  uniform sampler2D uTex; uniform vec3 uBg; uniform float uFade; uniform float uCopy;
+  out vec4 outColor;
+  void main() {
+    vec4 c = texture(uTex, vUV);
+    // uCopy = 1 -> 原样拷贝(blit); 0 -> 衰减: c*(1-FADE) + BG*FADE
+    outColor = vec4(mix(c.rgb * (1.0 - uFade) + uBg * uFade, c.rgb, uCopy), 1.0);
+  }`;
+  const VS_QUAD1 = `
+  attribute vec2 aPos; varying vec2 vUV;
+  void main() { vUV = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+  const FS_QUAD1 = `
+  precision mediump float;
+  varying vec2 vUV;
+  uniform sampler2D uTex; uniform vec3 uBg; uniform float uFade; uniform float uCopy;
+  void main() {
+    vec4 c = texture2D(uTex, vUV);
+    gl_FragColor = vec4(mix(c.rgb * (1.0 - uFade) + uBg * uFade, c.rgb, uCopy), 1.0);
+  }`;
+
+  /* ---- 第 8 轮: 3D 着色器(实例属性 = 位置 xyz + 速度 xyz, 速度建正交基定向) ---- */
+  const VS_BIRD3 = `#version 300 es
+  in vec2 aUnit;                 // 单位 ">" 的 6 个顶点(与 2D 共用)
+  in vec3 aPos;                  // 实例: 位置
+  in vec3 aVel;                  // 实例: 速度(决定朝向)
+  uniform mat4 uVP;
+  uniform vec3 uShape;
+  out float vFog;
+  void main() {
+    vec3 fwd = normalize(aVel + vec3(1e-4, 0.0, 0.0));
+    vec3 hint = abs(fwd.z) > 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0);
+    vec3 rgt = normalize(cross(fwd, hint));
+    vec3 up2 = cross(rgt, fwd);
+    vec3 p = aPos + fwd * (aUnit.x > 0.0 ? uShape.x : -uShape.y) + up2 * (aUnit.y * uShape.z);
+    vec4 clip = uVP * vec4(p, 1.0);
+    gl_Position = clip;
+    vFog = clamp(1.35 - clip.w * 0.00115, 0.18, 1.0);   // 雾: 按视距衰减
+  }`;
+  const FS_BIRD3 = `#version 300 es
+  precision mediump float;
+  in float vFog;
+  uniform vec3 uColor;
+  uniform vec3 uBg;
+  out vec4 outColor;
+  void main() { outColor = vec4(mix(uBg, uColor, vFog), 1.0); }`;
+
+  function compile(vsSrc, fsSrc) {
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, vsSrc); gl.compileShader(vs);
+    if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+      console.warn("顶点着色器编译失败:", gl.getShaderInfoLog(vs)); return null;
+    }
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs, fsSrc); gl.compileShader(fs);
+    if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+      console.warn("片元着色器编译失败:", gl.getShaderInfoLog(fs)); return null;
+    }
+    const p = gl.createProgram();
+    gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
+    gl.deleteShader(vs); gl.deleteShader(fs);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      console.warn("着色器程序链接失败:", gl.getProgramInfoLog(p)); return null;
+    }
+    return p;
+  }
+
+  function makeTex(w, h) {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+  function makeFBO(tex) {
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return ok ? f : null;
+  }
+
+  window.GLBackend = {
+    // 初始化: 拿 WebGL2(优先) / WebGL1 + ANGLE_instanced_arrays, 建程序/缓冲/FBO
+    init(s, cv, force) {
+      scene = s; canvas = cv;
+      if (!canvas || !canvas.getContext) return false;
+      const opts = { alpha: false, antialias: false, depth: true, stencil: false,   // 第 8 轮: 3D 需要深度
+                     preserveDrawingBuffer: false, powerPreference: "high-performance" };
+      try { gl = canvas.getContext("webgl2", opts); } catch (e) { gl = null; }
+      isGL2 = !!gl;
+      if (!gl) {
+        try {
+          gl = canvas.getContext("webgl", opts) || canvas.getContext("experimental-webgl", opts);
+        } catch (e) { gl = null; }
+      }
+      if (!gl) return false;
+      if (!isGL2) {
+        angleExt = gl.getExtension("ANGLE_instanced_arrays");
+        if (!angleExt) { console.warn("缺少 ANGLE_instanced_arrays, 回退 Canvas2D"); return false; }
+      }
+
+      progBird = compile(isGL2 ? VS_BIRD : VS_BIRD1, isGL2 ? FS_BIRD : FS_BIRD1);
+      progFade = compile(isGL2 ? VS_QUAD : VS_QUAD1, isGL2 ? FS_QUAD : FS_QUAD1);
+      if (!progBird || !progFade) return false;
+
+      // 单位 ">" 几何: 两个三角形共 6 顶点(鼻尖 + 左右翼), 静态上传一次
+      const UNIT = new Float32Array([
+        1, 0, -1, 0.72, -1, 1.28,       // 左臂: 鼻尖 -> 左翼外缘 -> 左翼内缘
+        1, 0, -1, -1.28, -1, -0.72,     // 右臂: 鼻尖 -> 右翼外缘 -> 右翼内缘
+      ]);
+      birdVBO = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, birdVBO);
+      gl.bufferData(gl.ARRAY_BUFFER, UNIT, gl.STATIC_DRAW);
+
+      // 全屏四边形(两个三角形), 残影淡出与最终拷贝共用
+      quadVBO = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+      gl.bufferData(gl.ARRAY_BUFFER,
+        new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+
+      maxN = s.maxN || 20000; maxM = s.maxM || 60;
+      starBuf = new Float32Array(maxN * 3);
+      gooseBuf = new Float32Array(maxM * 3);
+      instVBO = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, instVBO);
+      gl.bufferData(gl.ARRAY_BUFFER, starBuf.byteLength, gl.DYNAMIC_DRAW);   // 按最大 N 预留
+
+      texA = makeTex(s.W, s.H); texB = makeTex(s.W, s.H);
+      fboA = makeFBO(texA); fboB = makeFBO(texB);
+      if (!fboA || !fboB) { console.warn("离屏帧缓冲不完整, 回退 Canvas2D"); return false; }
+
+      // 两张纹理都清成背景色, 否则第一帧的残影是黑的
+      for (let k = 0; k < 2; k++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, k ? fboB : fboA);
+        gl.viewport(0, 0, s.W, s.H);
+        gl.clearColor(s.bg[0], s.bg[1], s.bg[2], 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.disable(gl.DEPTH_TEST);
+      gl.disable(gl.BLEND);                       // 鸟是不透明色块
+
+      // ---- 第 8 轮: 3D 资产(3D 失败不影响 2D 路径) ----
+      has3DFlag = false;
+      if (isGL2) {
+        prog3 = compile(VS_BIRD3, FS_BIRD3);
+        if (prog3) {
+          star3Buf = new Float32Array(maxN * 6);
+          goose3Buf = new Float32Array(maxM * 6);
+          instVBO3 = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, instVBO3);
+          gl.bufferData(gl.ARRAY_BUFFER, star3Buf.byteLength, gl.DYNAMIC_DRAW);
+          tex3 = makeTex(s.W, s.H);
+          fbo3 = gl.createFramebuffer();
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fbo3);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex3, 0);
+          depth3 = gl.createRenderbuffer();
+          gl.bindRenderbuffer(gl.RENDERBUFFER, depth3);
+          gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, s.W, s.H);
+          gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depth3);
+          has3DFlag = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          U3.vp = gl.getUniformLocation(prog3, "uVP");
+          U3.shape = gl.getUniformLocation(prog3, "uShape");
+          U3.color = gl.getUniformLocation(prog3, "uColor");
+          U3.bg = gl.getUniformLocation(prog3, "uBg");
+          A3.unit = gl.getAttribLocation(prog3, "aUnit");
+          A3.pos = gl.getAttribLocation(prog3, "aPos");
+          A3.vel = gl.getAttribLocation(prog3, "aVel");
+        }
+      }
+
+      U.res = gl.getUniformLocation(progBird, "uRes");
+      U.shape = gl.getUniformLocation(progBird, "uShape");
+      U.color = gl.getUniformLocation(progBird, "uColor");
+      U.tex = gl.getUniformLocation(progFade, "uTex");
+      U.bg = gl.getUniformLocation(progFade, "uBg");
+      U.fade = gl.getUniformLocation(progFade, "uFade");
+      U.copy = gl.getUniformLocation(progFade, "uCopy");
+      A.unit = gl.getAttribLocation(progBird, "aUnit");
+      A.inst = gl.getAttribLocation(progBird, "aInst");
+      A.quad = gl.getAttribLocation(progFade, "aPos");
+      gl.bindBuffer(gl.ARRAY_BUFFER, birdVBO);
+      gl.enableVertexAttribArray(A.unit);
+      gl.vertexAttribPointer(A.unit, 2, gl.FLOAT, false, 0, 0);      // 单位几何: 每实例共用
+      gl.bindBuffer(gl.ARRAY_BUFFER, instVBO);
+      gl.enableVertexAttribArray(A.inst);
+      gl.vertexAttribPointer(A.inst, 3, gl.FLOAT, false, 0, 0);      // 实例: 每只鸟一组
+      if (isGL2) gl.vertexAttribDivisor(A.inst, 1); else angleExt.vertexAttribDivisorANGLE(A.inst, 1);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+      gl.enableVertexAttribArray(A.quad);
+      gl.vertexAttribPointer(A.quad, 2, gl.FLOAT, false, 0, 0);
+      return true;
+    },
+
+    has3D() { return !!has3DFlag; },          // 第 8 轮: 3D 管线可用性
+
+    /* 第 8 轮: 3D 一帧 —— 深度清屏 -> 两批实例化(速度定向 + 雾) -> 拷到屏幕。
+     * 无 ping-pong 残影: 相机转动会让屏幕空间拖尾糊成一片, 3D 模式靠拖尾缓冲与尸体表达动势。 */
+    draw3D(s, vpM) {
+      const c = s.counts();
+      const P = s.P, V = s.V, Z = s.Z, VZ = s.VZ, alive = s.alive;
+      let n = 0;
+      const limN = Math.min(c.n, maxN);
+      for (let i = 0; i < limN; i++) {
+        if (!alive[i]) continue;
+        const o = n * 6;
+        star3Buf[o] = P[2*i]; star3Buf[o+1] = P[2*i+1]; star3Buf[o+2] = Z[i];
+        star3Buf[o+3] = V[2*i]; star3Buf[o+4] = V[2*i+1]; star3Buf[o+5] = VZ[i];
+        n++;
+      }
+      const gal = s.galive, P2 = s.P2, V2 = s.V2, Z2 = s.Z2, VZ2 = s.VZ2;
+      let m = 0;
+      for (let i = 0; i < Math.min(c.m, maxM); i++) {
+        if (!gal[i]) continue;
+        const o = m * 6;
+        goose3Buf[o] = P2[2*i]; goose3Buf[o+1] = P2[2*i+1]; goose3Buf[o+2] = Z2[i];
+        goose3Buf[o+3] = V2[2*i]; goose3Buf[o+4] = V2[2*i+1]; goose3Buf[o+5] = VZ2[i];
+        m++;
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo3);
+      gl.viewport(0, 0, s.W, s.H);
+      gl.clearColor(s.bg[0], s.bg[1], s.bg[2], 1);
+      gl.clearDepth(1);
+      gl.enable(gl.DEPTH_TEST);
+      gl.disable(gl.BLEND);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.useProgram(prog3);
+      gl.uniformMatrix4fv(U3.vp, false, vpM);
+      gl.uniform3f(U3.bg, s.bg[0], s.bg[1], s.bg[2]);
+      // 单位几何(6 顶点, 全实例共用)
+      gl.bindBuffer(gl.ARRAY_BUFFER, birdVBO);
+      gl.enableVertexAttribArray(A3.unit);
+      gl.vertexAttribPointer(A3.unit, 2, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribDivisor(A3.unit, 0);
+      // 实例: (x,y,z, vx,vy,vz), 24 字节步长
+      gl.bindBuffer(gl.ARRAY_BUFFER, instVBO3);
+      gl.enableVertexAttribArray(A3.pos);
+      gl.vertexAttribPointer(A3.pos, 3, gl.FLOAT, false, 24, 0);
+      gl.vertexAttribDivisor(A3.pos, 1);
+      gl.enableVertexAttribArray(A3.vel);
+      gl.vertexAttribPointer(A3.vel, 3, gl.FLOAT, false, 24, 12);
+      gl.vertexAttribDivisor(A3.vel, 1);
+      if (n > 0) {
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, star3Buf.subarray(0, n * 6));
+        gl.uniform3f(U3.shape, s.shapes.starling[0], s.shapes.starling[1], s.shapes.starling[2]);
+        gl.uniform3f(U3.color, s.colors.starling[0], s.colors.starling[1], s.colors.starling[2]);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);
+      }
+      if (m > 0) {
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, goose3Buf.subarray(0, m * 6));
+        gl.uniform3f(U3.shape, s.shapes.goose[0], s.shapes.goose[1], s.shapes.goose[2]);
+        gl.uniform3f(U3.color, s.colors.goose[0], s.colors.goose[1], s.colors.goose[2]);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, m);
+      }
+      gl.disable(gl.DEPTH_TEST);
+      // 收掉 3D 属性, 避免与 2D 程序的槽位冲突
+      gl.disableVertexAttribArray(A3.unit);
+      gl.disableVertexAttribArray(A3.pos);
+      gl.disableVertexAttribArray(A3.vel);
+      // 拷到默认帧缓冲(2D 叠加层覆盖在上面)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.useProgram(progFade);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, tex3);
+      gl.uniform1i(U.tex, 0);
+      gl.uniform1f(U.copy, 1);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+      gl.enableVertexAttribArray(A.quad);
+      gl.vertexAttribPointer(A.quad, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    },
+
+    info() {
+      if (!gl) return null;
+      return { gl2: isGL2, maxN, maxM, gl3d: !!has3DFlag,
+               vendor: gl.getParameter(gl.VENDOR), renderer: gl.getParameter(gl.RENDERER) };
+    },
+
+    // 每帧调用: ①残影淡出 ②两批实例化鸟 ③拷到默认帧缓冲 ④ping-pong 交换
+    draw(s) {
+      const c = s.counts();
+      const curFBO = curIsA ? fboA : fboB;
+      const prevTex = curIsA ? texB : texA;
+
+      /* ---- ① 用上一帧纹理做衰减, 写进当前 FBO ---- */
+      gl.bindFramebuffer(gl.FRAMEBUFFER, curFBO);           // 渲染目标 = 当前离屏缓冲
+      gl.viewport(0, 0, s.W, s.H);
+      gl.useProgram(progFade);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, prevTex);              // 采样上一帧
+      gl.uniform1i(U.tex, 0);
+      gl.uniform3f(U.bg, s.bg[0], s.bg[1], s.bg[2]);
+      gl.uniform1f(U.fade, s.fade);
+      gl.uniform1f(U.copy, 0);                             // 0 = 衰减模式
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+      gl.vertexAttribPointer(A.quad, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      /* ---- ② 组装实例缓冲(只装活着的鸟, 3 float/只) ---- */
+      const alive = s.alive, P = s.P, V = s.V;
+      let n = 0;
+      const limN = Math.min(c.n, maxN);
+      for (let i = 0; i < limN; i++) {
+        if (!alive[i]) continue;
+        starBuf[n * 3] = P[2 * i]; starBuf[n * 3 + 1] = P[2 * i + 1];
+        starBuf[n * 3 + 2] = Math.atan2(V[2 * i + 1], V[2 * i]);
+        n++;
+      }
+      const gal = s.galive, P2 = s.P2, V2 = s.V2;
+      let m = 0;
+      const limM = Math.min(c.m, maxM);
+      for (let i = 0; i < limM; i++) {
+        if (!gal[i]) continue;
+        gooseBuf[m * 3] = P2[2 * i]; gooseBuf[m * 3 + 1] = P2[2 * i + 1];
+        gooseBuf[m * 3 + 2] = Math.atan2(V2[2 * i + 1], V2[2 * i]);
+        m++;
+      }
+
+      /* ---- ③ 两次实例化绘制(旋转/缩放/投影都在着色器) ---- */
+      gl.useProgram(progBird);
+      gl.uniform2f(U.res, s.W, s.H);
+      gl.bindBuffer(gl.ARRAY_BUFFER, birdVBO);               // 第 8 轮: 3D 帧可能改过槽位, 每帧重设
+      gl.enableVertexAttribArray(A.unit);
+      gl.vertexAttribPointer(A.unit, 2, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, instVBO);
+      gl.vertexAttribPointer(A.inst, 3, gl.FLOAT, false, 0, 0);
+      if (n > 0) {
+        if (isGL2) gl.bufferSubData(gl.ARRAY_BUFFER, 0, starBuf, 0, n * 3);
+        else gl.bufferSubData(gl.ARRAY_BUFFER, 0, starBuf.subarray(0, n * 3));
+        gl.uniform3f(U.shape, s.shapes.starling[0], s.shapes.starling[1], s.shapes.starling[2]);
+        gl.uniform3f(U.color, s.colors.starling[0], s.colors.starling[1], s.colors.starling[2]);
+        if (isGL2) gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);
+        else angleExt.drawArraysInstancedANGLE(gl.TRIANGLES, 0, 6, n);
+      }
+      if (m > 0) {
+        if (isGL2) gl.bufferSubData(gl.ARRAY_BUFFER, 0, gooseBuf, 0, m * 3);
+        else gl.bufferSubData(gl.ARRAY_BUFFER, 0, gooseBuf.subarray(0, m * 3));
+        gl.uniform3f(U.shape, s.shapes.goose[0], s.shapes.goose[1], s.shapes.goose[2]);
+        gl.uniform3f(U.color, s.colors.goose[0], s.colors.goose[1], s.colors.goose[2]);
+        if (isGL2) gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, m);
+        else angleExt.drawArraysInstancedANGLE(gl.TRIANGLES, 0, 6, m);
+      }
+
+      /* ---- ④ 拷到默认帧缓冲(2D 叠加层覆盖在它上面) ---- */
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);            // 渲染目标 = 屏幕
+      gl.useProgram(progFade);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, curIsA ? texA : texB); // 本帧刚画好的纹理
+      gl.uniform1i(U.tex, 0);
+      gl.uniform1f(U.copy, 1);                             // 1 = 原样拷贝
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+      gl.vertexAttribPointer(A.quad, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      curIsA = !curIsA;                                    // ping-pong 交换
+    },
+  };
+})();
+</script>
+
+<script>
+"use strict";
+/* ============================================================================
+ * WebGPU 计算后端(第 6 轮 / WebGPU 迁移计划 Phase 1+2B 原型)
+ * ----------------------------------------------------------------------------
+ * 只把 step() 的 6.1(建网格) + 6.2(拓扑 K 邻居 + 求力) 搬到 GPU, 其余全部留 CPU:
+ *   GPU: clearGrid(桶头清 -1) -> insertBirds(原子头插链表) -> neighborForces(K=topoK 插入排序 + 求力)
+ *   CPU: 6.3 迁徙 / 6.4 积分与事件 / 6.5 雁 / 6.6 鹰 Q / 6.7 ES / 6.8 隼 / 6.10 互攻
+ * 每帧数据流(第 1 步原型, 同步回读只为量上限; 异步双缓冲是下一步):
+ *   上行 P、V(各 2N f32)、ALIVE(N u32)  ≈ 320KB @N=20000
+ *   下行 ACC(2N f32)                    ≈ 160KB @N=20000
+ * 桶用原子头插链表(array<atomic<i32>> head + array<i32> next), 因此**桶内顺序不确定**
+ * (与 CPU 的"位级一致"哲学冲突, 这是计划里已接受的取舍: 验收走统计等价)。
+ * 自检: 初始化时用同一份状态分别跑 CPU 版与 GPU 版, 逐只比较 ACC; 超差就自动退回 CPU —— 
+ * 这样即使 WGSL 有问题, 页面也不会给出错误的物理, 只会退回旧路径。
+ * ========================================================================== */
+(function () {
+  const WGSL = `
+struct Params {
+  n: u32, gw: u32, gh: u32, topoK: u32,
+  cell: f32, pad: f32, w: f32, h: f32,
+  perceptionR2: f32, sepR2: f32, sepGain: f32, maxSpeed: f32,
+  maxForce: f32, cohesionW: f32, alignmentW: f32, torus: u32,
+};
+@group(0) @binding(0) var<storage, read> P: array<f32>;        // 位置 x,y 交错
+@group(0) @binding(1) var<storage, read> VV: array<f32>;        // 速度 x,y 交错
+@group(0) @binding(2) var<storage, read> ALIVE: array<u32>;     // 1 = 活
+@group(0) @binding(3) var<storage, read_write> ACC: array<f32>; // 出力: 每帧转向力
+@group(0) @binding(4) var<storage, read_write> HEAD: array<atomic<i32>>;  // 桶链表头
+@group(0) @binding(5) var<storage, read_write> NXT: array<i32>;          // 桶链表 next
+@group(0) @binding(6) var<uniform> U: Params;
+
+// 桶头清 -1: 每线程一个桶
+@compute @workgroup_size(64)
+fn clearGrid(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let c = gid.x;
+  if (c >= U.gw * U.gh) { return; }
+  atomicStore(&HEAD[c], -1);
+}
+
+// 每鸟一个线程: 算桶号 -> 原子头插(next[i] = 旧 head)
+@compute @workgroup_size(256)
+fn insertBirds(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let i = gid.x;
+  if (i >= U.n) { return; }
+  if (ALIVE[i] == 0u) { return; }
+  let x = P[2u * i];
+  let y = P[2u * i + 1u];
+  var cx = i32(floor((x + U.pad) / U.cell));
+  var cy = i32(floor((y + U.pad) / U.cell));
+  cx = clamp(cx, 0, i32(U.gw) - 1);
+  cy = clamp(cy, 0, i32(U.gh) - 1);
+  let c = u32(cy) * U.gw + u32(cx);
+  let prev = atomicExchange(&HEAD[c], i32(i));   // 头插, 返回旧头
+  NXT[i] = prev;
+}
+
+// 环面最小像(开阔世界 = 恒等映射, 与 JS 版 minImageX/Y 一致)
+fn minIX(d: f32) -> f32 { if (U.torus == 1u) { return d - U.w * round(d / U.w); } return d; }
+fn minIY(d: f32) -> f32 { if (U.torus == 1u) { return d - U.h * round(d / U.h); } return d; }
+
+// 每鸟一个线程: 扫 3x3 桶的链, 取最近 topoK 只(升序槽位冒泡插入), 再按 CPU 同款公式求力
+@compute @workgroup_size(256)
+fn neighborForces(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let i = gid.x;
+  if (i >= U.n) { return; }
+  if (ALIVE[i] == 0u) { return; }
+  let xi = P[2u * i];
+  let yi = P[2u * i + 1u];
+  let vxi = VV[2u * i];
+  let vyi = VV[2u * i + 1u];
+  var cx = i32(floor((xi + U.pad) / U.cell));
+  var cy = i32(floor((yi + U.pad) / U.cell));
+  cx = clamp(cx, 0, i32(U.gw) - 1);
+  cy = clamp(cy, 0, i32(U.gh) - 1);
+
+  // K 个槽位(按距离升序), 上限 16 —— 与 CPU 的 KD/KX/KY/KJ 同构
+  var kd: array<f32, 16>;
+  var kx: array<f32, 16>;
+  var ky: array<f32, 16>;
+  var kj: array<i32, 16>;
+  var kn: i32 = 0;
+
+  for (var ox = -1; ox <= 1; ox = ox + 1) {
+    for (var oy = -1; oy <= 1; oy = oy + 1) {
+      var gx = cx + ox;
+      var gy = cy + oy;
+      if (U.torus == 1u) {
+        gx = ((gx % i32(U.gw)) + i32(U.gw)) % i32(U.gw);
+        gy = ((gy % i32(U.gh)) + i32(U.gh)) % i32(U.gh);
+      } else {
+        if (gx < 0 || gx >= i32(U.gw) || gy < 0 || gy >= i32(U.gh)) { continue; }
+      }
+      let c = u32(gy) * U.gw + u32(gx);
+      var j = atomicLoad(&HEAD[c]);
+      loop {
+        if (j < 0) { break; }
+        let jj = u32(j);
+        if (jj != i) {
+          let dx = minIX(P[2u * jj] - xi);
+          let dy = minIY(P[2u * jj + 1u] - yi);
+          let d2 = dx * dx + dy * dy;
+          if (d2 <= U.perceptionR2) {
+            var p: i32 = -1;
+            if (kn < i32(U.topoK)) { p = kn; kn = kn + 1; }
+            else if (d2 < kd[u32(kn) - 1u]) { p = kn - 1; }
+            if (p >= 0) {
+              loop {                                  // 冒泡到升序位置
+                if (p <= 0) { break; }
+                if (kd[u32(p) - 1u] <= d2) { break; }
+                kd[u32(p)] = kd[u32(p) - 1u];
+                kx[u32(p)] = kx[u32(p) - 1u];
+                ky[u32(p)] = ky[u32(p) - 1u];
+                kj[u32(p)] = kj[u32(p) - 1u];
+                p = p - 1;
+              }
+              kd[u32(p)] = d2; kx[u32(p)] = dx; ky[u32(p)] = dy; kj[u32(p)] = i32(jj);
+            }
+          }
+        }
+        j = NXT[jj];
+      }
+    }
+  }
+
+  var ax: f32 = 0.0;
+  var ay: f32 = 0.0;
+  if (kn > 0) {
+    var psx: f32 = 0.0; var psy: f32 = 0.0;
+    var vsx: f32 = 0.0; var vsy: f32 = 0.0;
+    var sepx: f32 = 0.0; var sepy: f32 = 0.0;
+    for (var m = 0; m < kn; m = m + 1) {
+      psx = psx + kx[m];
+      psy = psy + ky[m];
+      let jm = u32(kj[m]);
+      vsx = vsx + VV[2u * jm];
+      vsy = vsy + VV[2u * jm + 1u];
+      if (kd[m] < U.sepR2) {                        // 距离加权分离: 越近推得越狠
+        let wgt = 1.0 / max(kd[m], 1.0);
+        sepx = sepx - kx[m] * wgt;
+        sepy = sepy - ky[m] * wgt;
+      }
+    }
+    let knf = f32(kn);
+    let mx = U.cohesionW * psx / knf + U.alignmentW * vsx / knf;
+    let my = U.cohesionW * psy / knf + U.alignmentW * vsy / knf;
+    let nn = sqrt(mx * mx + my * my);
+    if (nn > 1e-9) {
+      ax = ax + clamp(mx / nn * U.maxSpeed - vxi, -U.maxForce, U.maxForce);
+      ay = ay + clamp(my / nn * U.maxSpeed - vyi, -U.maxForce, U.maxForce);
+    }
+    ax = ax + clamp(sepx * U.sepGain, -2.0 * U.maxForce, 2.0 * U.maxForce);
+    ay = ay + clamp(sepy * U.sepGain, -2.0 * U.maxForce, 2.0 * U.maxForce);
+  }
+  ACC[2u * i] = ax;
+  ACC[2u * i + 1u] = ay;
+}
+`;
+
+  let device = null, adapter = null, scene = null;
+  let bufP = null, bufV = null, bufAlive = null, bufACC = null, bufHead = null, bufNxt = null;
+  let bufU = null, stage = null;
+  let pipeClear = null, pipeInsert = null, pipeForces = null, bindGroup = null;
+  let aliveU32 = null, paramsBuf = null, paramsF32 = null, paramsU32 = null;
+  let maxN = 0, gwgh = 0;
+  let gpuDeviceLost = false;
+  let lastInfo = { ok: false, reason: "" };
+
+  function makeBuf(size, usage) { return device.createBuffer({ size: Math.max(16, size), usage }); }
+
+  window.ComputeBackend = {
+    /* 初始化: adapter/device -> buffer -> pipeline -> 自检(与 CPU 对拍) */
+    async init(s, force) {
+      scene = s;
+      lastInfo = { ok: false, reason: "" };
+      if (typeof navigator === "undefined" || !navigator.gpu) {
+        lastInfo.reason = "navigator.gpu 不存在(浏览器不支持或非安全上下文)";
+        return false;
+      }
+      try {
+        adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) { lastInfo.reason = "requestAdapter() 返回 null"; return false; }
+        device = await adapter.requestDevice();
+        if (!device) { lastInfo.reason = "requestDevice() 失败"; return false; }
+      } catch (e) {
+        lastInfo.reason = "初始化异常: " + (e && e.message);
+        return false;
+      }
+      maxN = s.maxN || 20000;
+      const GW = s.grid.gw, GH = s.grid.gh;
+      gwgh = GW * GH;
+      const U = GPUBufferUsage;
+      const SHADER_STAGE = (typeof GPUShaderStage !== "undefined") ? GPUShaderStage.COMPUTE : 4;
+      try {
+        bufP = makeBuf(2 * maxN * 4, U.STORAGE | U.COPY_DST);
+        bufV = makeBuf(2 * maxN * 4, U.STORAGE | U.COPY_DST);
+        bufAlive = makeBuf(maxN * 4, U.STORAGE | U.COPY_DST);
+        bufACC = makeBuf(2 * maxN * 4, U.STORAGE | U.COPY_SRC);
+        bufHead = makeBuf(gwgh * 4, U.STORAGE);
+        bufNxt = makeBuf(maxN * 4, U.STORAGE);
+        bufU = makeBuf(64, U.UNIFORM | U.COPY_DST);
+        stage = makeBuf(2 * maxN * 4, U.MAP_READ | U.COPY_DST);
+        aliveU32 = new Uint32Array(maxN);
+        paramsBuf = new ArrayBuffer(64);
+        paramsF32 = new Float32Array(paramsBuf);
+        paramsU32 = new Uint32Array(paramsBuf);
+
+        const module = device.createShaderModule({ code: WGSL, label: "boids-compute" });
+
+        // WGSL 编译错误要显式捞出来: createShaderModule 不抛异常, 否则只会看到黑屏/无输出
+        if (module.getCompilationInfo) {
+          try {
+            const ci = await module.getCompilationInfo();
+            const errs = (ci.messages || []).filter(m => m.type === "error");
+            if (errs.length) {
+              lastInfo.reason = "WGSL 编译错误: " + errs.map(m => `${m.lineNum}:${m.linePos} ${m.message}`).join(" | ");
+              return false;
+            }
+          } catch (e) { /* 某些实现没有 getCompilationInfo, 忽略 */ }
+        }
+        // 未捕获的 WebGPU 错误(校验失败等)打到控制台, 便于定位
+        if (device.addEventListener) {
+          device.addEventListener("uncapturederror", ev => {
+            console.warn("WebGPU 未捕获错误:", ev.error && ev.error.message ? ev.error.message : ev.error);
+          });
+        }
+        if (device.lost && device.lost.then) {
+          device.lost.then(info => {
+            if (info && info.reason !== "destroyed") {
+              console.warn("WebGPU device 丢失(" + info.reason + "), 计算将退回 CPU 路径");
+              gpuDeviceLost = true;
+            }
+          });
+        }
+
+        // 显式绑定布局 + 管线布局: 三趟 pass 共用一个 bind group。
+        // (不能用 layout:"auto" —— 各 pass 静态用到的 binding 不同, 自动布局会不一样,
+        //  同一个 bind group 在别的 pass 上会直接校验失败。)
+        const bgl = device.createBindGroupLayout({
+          label: "boids-bgl",
+          entries: [
+            { binding: 0, visibility: SHADER_STAGE, buffer: { type: "read-only-storage" } }, // P
+            { binding: 1, visibility: SHADER_STAGE, buffer: { type: "read-only-storage" } }, // V
+            { binding: 2, visibility: SHADER_STAGE, buffer: { type: "read-only-storage" } }, // ALIVE
+            { binding: 3, visibility: SHADER_STAGE, buffer: { type: "storage" } },            // ACC
+            { binding: 4, visibility: SHADER_STAGE, buffer: { type: "storage" } },            // HEAD(原子)
+            { binding: 5, visibility: SHADER_STAGE, buffer: { type: "storage" } },            // NXT
+            { binding: 6, visibility: SHADER_STAGE, buffer: { type: "uniform", minBindingSize: 64 } }, // Params
+          ],
+        });
+        const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [bgl] });
+
+        const mk = (entryPoint, label) => device.createComputePipeline({
+          label, layout: pipelineLayout,
+          compute: { module, entryPoint },
+        });
+        pipeClear = mk("clearGrid", "clearGrid");
+        pipeInsert = mk("insertBirds", "insertBirds");
+        pipeForces = mk("neighborForces", "neighborForces");
+        bindGroup = device.createBindGroup({
+          layout: bgl,
+          entries: [
+            { binding: 0, resource: { buffer: bufP } },
+            { binding: 1, resource: { buffer: bufV } },
+            { binding: 2, resource: { buffer: bufAlive } },
+            { binding: 3, resource: { buffer: bufACC } },
+            { binding: 4, resource: { buffer: bufHead } },
+            { binding: 5, resource: { buffer: bufNxt } },
+            { binding: 6, resource: { buffer: bufU } },
+          ],
+        });
+      } catch (e) {
+        lastInfo.reason = "资源创建异常: " + (e && e.message);
+        return false;
+      }
+      lastInfo = { ok: true, reason: "", adapter: adapter.info ? (adapter.info.vendor + " " + adapter.info.architecture) : "n/a",
+                   maxN, gwgh, workgroups: { clear: Math.ceil(gwgh / 64), bird: Math.ceil(maxN / 256) } };
+      return true;
+    },
+
+    info() { return lastInfo; },
+    ready() { return !!(device && pipeForces && !gpuDeviceLost); },
+    dispose() { try { if (device) device.destroy(); } catch (e) {} device = null; },
+
+    /* 把 CPU 侧状态写进 uniform(P/V/ALIVE 由 frame() 上传) */
+    updateParams(s) {
+      const c = s.counts();
+      paramsU32[0] = c.n; paramsU32[1] = s.grid.gw; paramsU32[2] = s.grid.gh; paramsU32[3] = s.grid.topoK;
+      paramsF32[4] = s.grid.cell; paramsF32[5] = s.grid.pad; paramsF32[6] = s.W; paramsF32[7] = s.H;
+      paramsF32[8] = s.grid.perceptionR2; paramsF32[9] = s.grid.sepR2; paramsF32[10] = s.grid.sepGain;
+      paramsF32[11] = s.grid.maxSpeed; paramsF32[12] = s.grid.maxForce;
+      paramsF32[13] = s.grid.cohesionW; paramsF32[14] = s.grid.alignmentW;
+      paramsU32[15] = s.grid.torus ? 1 : 0;
+      device.queue.writeBuffer(bufU, 0, paramsBuf, 0, 64);
+    },
+
+    /* 一帧: 上传 -> 3 个 pass + 回读 -> 写进 scene.ACC
+     * 返回 { uploadMs, gpuMs, readbackMs } */
+    async frame(s) {
+      const c = s.counts();
+      const n = c.n;
+      const t0 = performance.now();
+      device.queue.writeBuffer(bufP, 0, s.P, 0, 2 * n);
+      device.queue.writeBuffer(bufV, 0, s.V, 0, 2 * n);
+      const alive = s.alive;
+      for (let i = 0; i < n; i++) aliveU32[i] = alive[i] ? 1 : 0;
+      device.queue.writeBuffer(bufAlive, 0, aliveU32, 0, n);
+      this.updateParams(s);
+      const tUp = performance.now();
+
+      const enc = device.createCommandEncoder();
+      const wgClear = Math.ceil(s.grid.gw * s.grid.gh / 64);
+      const wgBird = Math.ceil(n / 256);
+      let cp = enc.beginComputePass(); cp.setPipeline(pipeClear); cp.setBindGroup(0, bindGroup);
+      cp.dispatchWorkgroups(wgClear); cp.end();
+      cp = enc.beginComputePass(); cp.setPipeline(pipeInsert); cp.setBindGroup(0, bindGroup);
+      cp.dispatchWorkgroups(wgBird); cp.end();
+      cp = enc.beginComputePass(); cp.setPipeline(pipeForces); cp.setBindGroup(0, bindGroup);
+      cp.dispatchWorkgroups(wgBird); cp.end();
+      enc.copyBufferToBuffer(bufACC, 0, stage, 0, 8 * n);
+      device.queue.submit([enc.finish()]);
+
+      await stage.mapAsync(GPUMapMode.READ, 0, 8 * n);
+      const tGpu = performance.now();
+      s.ACC.set(new Float32Array(stage.getMappedRange(0, 8 * n)));   // 回读到 CPU 的 ACC
+      stage.unmap();
+      const tEnd = performance.now();
+      return { uploadMs: tUp - t0, gpuMs: tGpu - tUp, readbackMs: tEnd - tGpu };
+    },
+
+    /* 自检: 同一状态分别跑 CPU 版与 GPU 版 6.1+6.2, 逐只比较 ACC。
+     * 只比**活着的鸟**(死鸟的 ACC 两边都不写, 槽位里可能是上一次的残留/NaN, 不参与比较)。
+     * 超差 -> 主脚本退回 CPU(宁可慢也不能算错)。 */
+    async selfCheck(s, cpuForcesRef) {
+      const n = s.counts().n;
+      const aliveArr = s.alive;
+      const cpuACC = new Float32Array(2 * n);
+      cpuForcesRef(cpuACC);                       // 主脚本: 跑 cpuGridAndForces 并把 ACC 拷进 cpuACC
+      const gpuACC = new Float32Array(2 * n);
+      await this.frame(s);
+      gpuACC.set(s.ACC.subarray(0, 2 * n));
+      cpuForcesRef(cpuACC);                       // 再跑一次, 把 CPU 状态复原(ACC 归位)
+      let maxAbs = 0, maxRel = 0, bad = 0, worst = -1, checked = 0;
+      for (let i = 0; i < n; i++) {
+        if (!aliveArr[i]) continue;               // 死鸟不参与
+        for (let k = 0; k < 2; k++) {
+          const idx = 2 * i + k;
+          const a = cpuACC[idx], b = gpuACC[idx];
+          checked++;
+          if (!Number.isFinite(b)) { bad++; continue; }
+          const d = Math.abs(a - b);
+          const r = d / Math.max(1e-6, Math.abs(a));
+          if (d > maxAbs) { maxAbs = d; worst = i; }
+          if (r > maxRel && Math.abs(a) > 1e-6) maxRel = r;
+          if (d > 1e-4 && r > 1e-3) bad++;
+        }
+      }
+      const passed = bad === 0 && maxAbs < 1e-4;
+      return { passed, maxAbs, maxRel, bad, n, checked, worst };
+    },
+  };
+})();
+</script>
+
+</body>
+</html>
+<!-- 交接说明 ============================================================
+ 变更记录(第 2 轮, A~G):
+  A 空冲刺扣分: 隼/鹰加 dashEats, 冲刺结束仍为 0 则隼 -4 / 鹰 -3(鹰的罚款
+    同时进 pending, 保证 Q 学习看得到)。只扣 score, 不动 kills/diet。
+  B 代谢成本: 隼盘旋 -METAB_CIRCLE、冲刺 -METAB_DASH; 鹰每帧在取 reward
+    之前先 E.pending -= METAB_EAGLE, 学的是净期望值。
+  C 围攻(mobbing): 8% 椋鸟是围攻者, 170px 内结骚扰环(环外逼近/环内推开,
+    限幅 MOB_MAX); 猛禽冲刺能耗乘 (1+mob*0.04), mob>=25 时冲刺被当场打断
+    (走正常落空罚款), 非冲刺速度乘 max(0.6, 1-mob*0.01)(鹰 0.7 下限、系数减半)。
+  D 迷惑效应: 冲刺锁定 pc.bi 那一只, 锁定期间只吃得到它; 冲刺结束解锁。
+    追雁/攻隼/互相驱逐都不锁定(传 -1)。
+  E 鹰隼互攻(驱逐制): raptors 两两判定, 实力 = 冲刺+2 / 鹰体型+1.5 / 眩晕-3
+    / 噪声; 败方击退 11px + 眩晕 90 帧 + 扣 10 分 + 被抢走剩余分数的 20%,
+    胜方拿走抢来的分并 dashEats++(免落空罚款)。Q 表扩到第 4 动作"攻隼"。
+    额外加了 CLASH_CD=45 冷却: 否则贴在一起的两只会逐帧连环扣分, 分数瞬间
+    崩掉 —— 这是规格之外的一处必要补充。
+  F 体型与判定收小: 椋鸟 2.2/雁 3.2/隼 6.5/鹰 7.5, 判定圈 9/12, 辉光与标签
+    同步内收(标签不再压住身体)。
+  G 收紧鸟群: COHESION 2.0 / ALIGNMENT 1.2 / MAX_FORCE 0.15 / SEP 20 /
+    PERCEPTION 50(CELL 与 GW/GH 自动跟随, 拓扑 K 仍为 7)。收得太死就把
+    COHESION 回 1.6; 仍散就把 CENTROID_FORCE 提到 0.025。
+  附(为诊断验收判据 3 加的一处非 A~G 机制, 默认关闭): EAGLE_DECIDE_EVERY ——
+    鹰的 ε-greedy 可切换成"决策纪元"式(动作保持 N 帧再重抽)。诊断结论:
+    判据 3 成立的真正瓶颈不是"动作被打断", 而是 雁近状态下 追椋 与 追雁 的
+    期望回报本来就几乎相等(实测 4 粒种子 × 3 组参数, 两者相差普遍 <0.5%,
+    甚至抓到 6 只雁的那一局仍是 8.91 vs 8.94)。默认 1 = 逐帧重抽, 与原行为一致。
+ 面板多一行计数器(空冲刺/突围打断/锁定冲刺/互攻抢分), 文末注释即本段。
+
+ 变更记录(第 3 轮, 状态栏可收起):
+  标题栏右侧加「收起 ▸ / 展开 ◂」按钮, 快捷键 H; 收起时 #panel 加 .collapsed
+  只隐藏 #panelBody, 画面全让给仿真。状态尽量用 localStorage 记住, file:// 下
+  不可用则由 try/catch 降级成"不记住"。程序化入口: SIM.setPanelHidden / SIM.panelHidden。
+
+ 变更记录(第 4 轮): 采样目标获取 / 雁群中心化重构 / 隼的策略进化 / 借网预警, 见下五节。
+
+ ============================ 任务0: 物理成本基准 ============================
+ 用 SIM.bench(300, [2000,5000,10000,20000]) 在控制台一次跑完(只调 step(), 不碰 render),
+ 每档取 300 帧的中位数 / p90 / p99:
+        N     中位(ms)   p99(ms)    结论
+      2000      9.6       40.2
+      5000     28.4      115.3
+     10000     78.7      116.4     远大于 8ms 门限 -> **物理是瓶颈**
+     20000    225.5      309.3
+ 判定: N=10000 的 step 中位数 78.7ms > 8ms, 所以先做任务1 再做渲染。任务1 之后复测:
+     10000 -> 78.7ms, 20000 -> 304ms(没有数量级改善: 瓶颈是 O(可见邻居) 的拓扑选邻居,
+     不是分配)。线性外推每只鸟 6~15µs/帧(密度越高越贵):
+     **JS 物理上限约 2600 只 @60FPS(16.7ms/帧), 约 5100 只 @30FPS(33.3ms/帧)。**
+     验收里的 N=10000/20000 帧率目标在纯 JS 物理下不可能达到 —— 这不是渲染的问题,
+     渲染侧 CPU 只占 1.9ms / 3.7ms(见下)。
+
+ ============================ 任务1: 热循环零分配 ============================
+ 改动:
+  · 网格从 Map<key, number[]> + 每帧新建数百个小数组, 换成经典链表池化:
+    head = Int32Array(GW*GH)(每帧只 fill(-1)) + next = Int32Array(MAXN), 头插, 遍历走链;
+  · perceive() 去掉 grid.forEach 闭包与返回对象字面量(复用 PC), 热循环里不再建对象/数组;
+  · 猛禽记忆 mem{x,y,t} -> memX/memY/memT 三个字段; policyVals() 复用 PVV 对象;
+  · 雁的槽位计算内联(原来每帧 60 个 {x,y}); 拖尾从 push+splice 改成定容环形缓冲 trailBuf;
+  · 死亡涟漪从数组 push+splice 改成 DEATH_CAP=512 的环形池(deathX/Y/T);
+  · 补猎物不再收集 dead 索引数组; 渲染侧 preprint 辉光精灵、缓存虚线数组与拖尾颜色字符串。
+ 【关键】遍历顺序必须与旧版逐位一致: 链表是头插法(桶内降序), 所以额外记 cellOrder
+ (桶首次出现顺序 = 旧 Map 的插入顺序)并把链逆成升序(chainBuf)。否则浮点求和顺序一变,
+ 混沌系统会放大成完全不同的轨迹。
+ 验证: _checks/golden.mjs 固定种子 2000 帧的 PHYSICS_HASH **改造前后都是 e3c17c85**
+ (逐位一致, 说明"物理语义一行不改"); _checks/order_test.mjs 再用 Map 参照实现逐位比对
+ 质心遍历(0/20 不一致); GC: Mark-Compact 由 9 次/8000 帧降到 **1 次/6000 帧**(Major GC ≈ 0),
+  scavenge 全部 < 0.5ms。
+
+ ============================ 任务2: 渲染后端(WebGL 实例化) ============================
+ 双层画布(同一 #stage 内绝对定位):
+   #glcv(z=0, WebGL2 / WebGL1+ANGLE_instanced_arrays) —— 椋鸟/雁(实例化) + 拖尾残影
+   #cv  (z=1, Canvas2D 叠加层, 透明) —— 猛禽/标签/能量条/死亡涟漪/小地图/视野圈/配合轴线/威慑锥
+   (?render=2d 时只走 #cv, 调用保留下来的 render2D() 原路径, 便于 A/B 与兜底)
+ GL 每帧管线:
+   ① bindFramebuffer(fboCur) -> useProgram(fade) -> 采样 prev 纹理画全屏四边形:
+        outColor.rgb = prev.rgb * (1 - 0.16) + BG.rgb * 0.16       (BG = 10,12,18 / 255)
+      与旧版每帧 fillRect(rgba(10,12,18,0.16)) 在数学上等价(blend 用不透明色块实现);
+   ② 组装实例缓冲: starBuf[n*3] = x, +1 = y, +2 = atan2(vy, vx), 只装活着的鸟;
+      bufferSubData(ARRAY_BUFFER, 0, starBuf, 0, n*3)(GL1 回退用 subarray);
+   ③ useProgram(bird) -> 两次 drawArraysInstanced(TRIANGLES, 0, 6, n):
+        椋鸟 n=aliveCount, uColor=rgb(200,215,235), uShape=(2.2, 1.4, 1.4)
+        雁   n=galiveCount, uColor=rgb(255,200,110), uShape=(3.2, 1.8, 2.0)
+      顶点着色器: 单位 ">"(两个三角形 6 顶点: 鼻尖(+1,0) / 左右翼 (-1,±0.72…±1.28),
+      翼端厚 0.56 单位 ≈ 0.8~1.1px) -> 按 uShape 缩放 -> 用 instance 的 angle 做 cos/sin 旋转
+      -> 平移 -> 投影: clip = (x/W*2-1, 1 - y/H*2)(y 翻转在投影里做, 不逐顶点翻);
+   ④ bindFramebuffer(null) -> 同一个全屏四边形程序(uCopy=1)把 fboCur 拷到屏幕;
+   ⑤ ping-pong: prev/cur 两张 RGBA8 纹理 + FBO 每帧交换; preserveDrawingBuffer=false;
+      注意 FBO 不开 MSAA, 所以鸟的斜边没有 2D 描边那样的抗锯齿(体量/颜色与 2D 一致)。
+ 实例缓冲布局(32 字节/只, 交错无 padding): [x:f32][y:f32][angle:f32] × N; 静态几何只有 6 个
+ vec2 = 48 字节, 一次上传; 顶点属性 divisor: aUnit=0(每实例共用), aInst=1(每只鸟一组)。
+ 实测(本机 Node, mock GL; step 与 render 分开取 60 帧中位数):
+        N     step 中位   step p99   render(CPU) 中位
+      2000      12.0ms     45.3ms        0.52ms
+      5000      31.7ms     36.3ms        1.02ms
+     10000      89.4ms    151.0ms        1.94ms
+     20000     304.4ms    348.7ms        3.70ms
+   → render 在 N=20000 也只有 3.7ms(验收要求 <=4ms) 达标; 帧率被 step 卡住(见任务0 结论)。
+     注意 headless 的 GL 是模拟上下文, 3.7ms 是"CPU 侧组装实例 + 2D 叠加层"的耗时, GPU 只做
+     2 次 instanced draw, 真实浏览器里 GPU 时间可忽略; 2D 叠加层里最贵的是小地图抽点(每 6 只
+     一个点, N=20000 约 3300 点)。
+ 验证: _checks/headless.mjs 用假 WebGL2 上下文跑通整条 GL 路径并断言: 初始化成功、实例缓冲
+ 逐只等于 (x,y,atan2(vy,vx))、两次 draw call 的实例数 = 存活数、每次 6 顶点、ping-pong 每帧
+ 交换、最后一趟绑回默认帧缓冲做拷贝、SIM.perf 三个字段。
+
+ ============================ 探索性观察: topoK 与密度 ============================
+ 理论预言"邻居数恒定 -> 群体形态应与 N 无关"。无猛禽干扰各跑 30 秒后:
+        N      最近邻    第7近邻   极化度   展布    展布/第7近邻
+      2000     11.4px    21.3px    0.893   215px      10.12
+     20000      6.2px    12.0px    0.896   351px      29.18
+ 结论:**局部结构确实拓扑化**(最近邻与第7近邻随 N 变小, 但都与 1/√N 同量级, 邻居数恒定),
+ 但**全局形态与 N 相关** —— 归一化的"展布/第7近邻"从 10.1 涨到 29.2。原因是凝聚力/迁徙/
+ 软边界/分离半径(SEP_R=20px)都是**绝对像素尺度**, 只有"选邻居"这一步是拓扑的。所以严格
+ 意义上的"形态与 N 无关"在本实现里被证伪; 想让它成立需要把 SEP/COHESION 也换成相对尺度。
+
+ ============================ 第 4 轮之一: 采样目标获取 ============================
+ 问题: 最密网格桶有量化误差; 质心可能正好落在隼自己犁出的空腔里; 也无法扩展风险项。
+ 做法(P1): perceive() 在收集可见椋鸟的同时, 以猛禽为原点布 5 环 × 16 角 = 80 个极坐标
+   候选点, 每只鸟累加进"距离 < SCOOP_R 的候选点", 得到一个 80 维的"捞勺计数"。
+   打分公式:
+     score(c) = (c 的捞勺内鸟数) × (1 + DIR_LAG·cos(候选方向, 当前航向))
+                × [锥内乘项]        // 见第 4 轮之二 D
+                // 扩展位: 雁权重 / 威慑锥扣分 / mob 扣分
+   方向滞后项让目标不会在两个等分候选点之间抖动; 锥内乘项让"选目标"自己绕开雁群正面,
+   而不是写一条"猛禽看见雁就躲"的硬编码。
+   取 argmax 候选点为冲刺中心 (cx,cy); LOCK_R=40px 内最近的鸟为 lockIdx,
+   40px 内没有鸟就放弃这次冲刺(不做无效冲刺)。tryDash 的 lockIdx 语义不变:
+   冲刺途中只吃得到被锁定的那一只(雁的 EAT 判定不加, 雁大不存在迷惑);
+   互攻/驱逐冲刺传 -1, 冲刺结束 lockIdx 归 -1。
+   常量: SAMPLE_RADII={80,160,240,320,400} SAMPLE_ANGLES=16 SCOOP_R=60 LOCK_R=40
+         DIR_LAG=0.3  (候选距猛禽 > VIEW_R - SCOOP_R 的直接跳过)
+   性能: 内层用"半径平方 + 预计算角度窗(CAND_W)"把每只鸟的候选测试从 80 次压到 5~10 次,
+   N=2000 下整步约 9~11ms。
+
+ ============================ 第 4 轮之二: 雁群中心化重构 ============================
+ 目标: 雁从"有槽位的椋鸟"变成真正的中心化组织 —— 响应即时、无单点故障、有威慑,
+   但保留制度性弱点。
+ A 领队智能: LEADER_SENSE_R=400 内最近猛禽 -> leaderAng 以 LEADER_MAX_TURN=0.04 rad/帧
+   限速转向远离; 无威胁时随机游动 + 向心; 威胁 < LEADER_PANIC_R=250 时全队速度
+   ×ESCAPE_HUSTLE=1.15。每只雁另有 GOOSE_MAX_TURN=0.06 rad/帧 的转向限速(压坡惯性)。
+ B 轮值领队: ROTATE_FRAMES=1200(20 秒)换一次 apex; 槽位号 slot(i) = (i + gooseShift) % M,
+   虚拟领队位置就是当前 apex 雁的位置(所以换岗不瞬移, leaderAng 继承)。没有可斩首的固定领队。
+   幼雁内道靠"残类"实现: 幼雁是固定个体(i % 4 === 0, 25%), 而 4 | M=60, 所以它们的槽位
+   残类恒等于 gooseShift % 4 —— 把这一残类的槽位排成内道(小排号), 幼雁就永远在内道。
+ C 核心保护: JUVENILE_FRAC=0.25; 幼雁死亡 -> JUVENILE_DEBUFF_FRAMES=1800 帧内全体归位力
+   ×DEBUFF_FACTOR=0.7(沮丧期)。
+ D 威慑锥: 顶点 = V 尖, 轴 = 领队航向, 半角 60°, 半径 CONE_R=180。两个效果:
+   a) 锥内候选点打分 ×CONE_SCORE_FACTOR=0.25(与之一咬合, 选目标自己绕开正面);
+   b) 锥内猛禽持续失血: 隼冲刺能耗 ×CONE_FALCON_DASH_MULT=2、鹰每帧 pending -= 0.01
+      (走 pending 才进得了 Q 表 —— 威慑是"被定价", 不是硬编码行为)。锥只罩正面 120°,
+      绕后不受罚, 保留渗透缝隙。
+ E 斩首混乱: 当前 apex 被吃的瞬间 disarray = DISARRAY_FRAMES=90: 槽位力关闭, 全体退化为
+   个体径向逃逸(复用逃逸路径), 结束后按新 apex 重建。这是雁相对椋鸟群的结构性弱点。
+
+ ============================ 第 4 轮之三: 隼的策略进化 ============================
+ 原则: 制度(能量轮换/拦截位/交棒/驱逐)不学, 学的是制度内的操作参数 —— 鹰学价值(Q-learning),
+   隼学策略(进化), 两种学习哲学同框。
+ 可学习参数(每只隼一份, 归一化 [0,1] 存储):
+   p1 出手能量阈值 -> DASH_MIN     ∈[20,60] 默认 35
+   p2 交棒能量阈值 -> ENERGY_LOW   ∈[10,40] 默认 25
+   p3 双打能量阈值 -> DOUBLE_TEAM_E∈[60,95] 默认 85
+   p4 拦截位外推   -> INTERCEPT_AHEAD ∈[0.3,0.8] 默认 0.55
+   p5 mob 容忍     -> 乘在 DASH_DRAIN 的 mob 项上 ∈[0,2] 默认 1.0
+   p6 线性冲刺策略(4 维特征 + 阈值)留作扩展位, 未实现 —— 若要做, 在 6.8 的出手判定处
+      把 PV_.dashMin 比较换成 w·[能量, 目标密度, 1-mob, 航向对齐度] > θ, 并把 w/θ 塞进 ES 向量。
+ 算法: (1+1)-ES 在线进化, ES_EVAL_FRAMES=3600(60 秒)一个评估期(适应度噪声大, 期长配对比较)。
+   双缓冲: 偶数期评估当前参数, 奇数期评估"当前 + N(0, ES_SIGMA=0.1) 截断到 [0,1]"的候选;
+   期末配对比较, 候选更好就采纳(p = cand, gen++), 否则回滚。两只隼各自抽噪声, 随机源不共享。
+   适应度(本期净值):
+     fit = Δscore - ES_MISS_WEIGHT(=2)·Σ落空罚款 - ES_METAB_WEIGHT(=5)·Σ代谢成本
+   无价值函数、无状态抽象, 纯爬山 —— 允许学成"永不出手"的局部最优(此时 fit≈0, 不出手
+   既不赚也不罚), 那是诚实的失败模式, 不是 bug。
+   观测: 面板「重置隼策」按钮 / SIM.falconPolicies / 每只隼能量条上方的"策略 n 代"小字。
+
+ ============================ 第 4 轮之四: 雁的借网预警 ============================
+ 雁从"只看 150px 内的猛禽本体", 扩展为接入椋鸟群(2000 节点分布式传感器网)。
+ 1 惊飞度: 新增 PV 数组存上帧速度; 判据 = 本帧与上帧速度夹角 > 60°(cos < PV_ALERT_COS=0.5)。
+   【陷阱】必须在位置更新之后、覆盖 PV 之前算 —— 顺序错一帧(先覆盖再比)等于拿自己比自己,
+   全体误报。另外不用速度大小当指标: 椋鸟平时也贴满速。
+ 2 雁判定: 用现有网格查周边 3×3 桶, ALERT_R=140 内惊飞椋鸟 >= ALERT_N=3 -> 视同猛禽进入
+   FORMATION_BREAK: 编队解散, 逃逸方向 = 惊飞椋鸟的平均速度方向(它们逃向即远离猛禽方向,
+   直接跟流)。与自身 150px 的猛禽感知取并集。
+ 3 涌现代价(不修): 椋鸟翻滚会致误报, 雁散一下又合拢 —— 这是偷听公共信息的真实成本。
+   ALERT_N 调高误报少但预警慢。面板能看到"借网预警 n 次(误报 m)"。
+
+ ============================ 第 4 轮之五: 本轮变更记录 ============================
+ · 新增 6.7 隼策略进化(期界结算, 在隼行动之前, 新期参数当帧生效), 原 6.7/6.8/6.9 顺延为
+   6.8/6.9/6.10; 每帧顺序与几何双模式未改。
+ · perceive() 签名变为 (px, py, vx, vy, viewR2), 返回值增加 {cx, cy, lockIdx, score};
+   原 {x, y, n, bi} 保留(bi 语义 = 中心附近的代表鸟, 供伏击按它速度外推)。
+ · 雁的槽位几何整体重写(gooseSlot/initGeese/rebuildFormation/rotateLeader/gooseDies),
+   6.5 节重写; 椋鸟与猛禽的能量/学习逻辑未动(只加了 score 乘项、锥内失血、隼参数化)。
+ · Q 索引全部走 state*N_ACTIONS + a(本轮 N_ACTIONS 仍是 4, 无字面量 *3 遗留)。
+ · SIM 新增: geeseInfo / falconPolicies / resetFalconPolicies / setEvalFrames / probe /
+   inCone / killGoose / slotOf / slotRankArm / isJuvenile / startledCount / startledRatio /
+   samplingConst / pvConst / esConst。
+ · 渲染新增: 雁群威慑锥(浅蓝扇形)、小地图上的领队点与航向、隼的"策略 n 代"、面板一行
+   雁群/借网/锥/隼策状态。
+ ================================================================================
+
+ 这一版把两份文件整合成了一份, 各自贡献与取舍如下:
+
+ [A 版 boids.html: 拓扑椋鸟 + 双隼, 开阔软边界世界]
+  · 拓扑邻居(每只只跟最近的 K 只互动) —— 保留, 且 K 变成可调滑杆(3~14)。
+    半径邻居 vs 拓扑邻居的差别: 前者在密集处会被几百只平均掉、在稀疏处
+    又没人可对齐; 后者无论密度如何都只取最近 K 只, 群体形态更稳定。
+  · N 可上探的规模 —— 保留, 数组预分配到 MAXN=4000, N 滑杆实时改。
+  · 屏幕外的开阔缓冲带 + 柔性边界(没有穿屏瞬移) —— 保留为默认几何,
+    并给出「环面」开关切回 B 版的无边界穿屏世界。所有几何运算统一走
+    wrapX/wrapY/minImageX/minImageY, 两种模式共用同一套仿真代码。
+  · 休息隼高速赶往拦截位(REST_SPEED) —— 保留, 与 B 版的拦截位几何合并。
+  · A 版"按候选邻居数量选最密个体"当冲刺目标 —— 换成 B 版的
+    perceive() 视野内最密桶代表鸟: 前者用了全局信息, 与"猛禽只有局部
+    视野"的设定冲突。
+
+ [B 版 椋鸟群·双隼协作·学习鹰: 雁编队 + Q 学习鹰 + 计分]
+  · 雁群领队 V 编队(对照组) —— 整体保留, 加了编队引导线可视化。
+  · 鹰的 Q-learning 猎物偏好 —— 保留(7 态 × 3 动作), 但**修了折扣因子**:
+    原版 Q_GAMMA=0.95 是"每帧"折扣, 半衰期只有 14 帧 —— 追一次雁要几百帧,
+    信用在几步内就衰减光了, Q 表实际退化成噪声。整合版改成 0.995(半衰期
+    约 140 帧), 学习才真正成立: 实测 12000 帧后 雁近→追雁 11.7、
+    椋近→追椋 9.8, 与"雁值 100 分但难抓、椋鸟近处好抓"的设定一致。
+    另新增 Q 表热力图(含各状态贪心动作标记)、食谱比例条, 让学会了什么看得见。
+  · 能量轮换 / 拦截位 / 双打 / 60° 冲刺约束 —— 保留。
+  · 局部视野 perceive() —— 保留并升级: 桶心粗筛 + 逐只精确判距, 质心
+    按环面/开阔分别用圆均值或算术均值。
+  · 计分板 / 重置按钮 —— 保留, 并加了捕获数、捕获率、时间与自动补充。
+
+ [新增(两边都没有)]
+  · 开阔世界的小地图: 视口只是世界的一部分, 没有全局视图会跟丢猎物。
+  · 猛禽记忆点搜索: 视野为空时飞向最后看到猎物的位置(300 帧内有效),
+    否则原地盘旋搜索 —— 局部视野在开阔世界里必须配记忆, 否则会瞎逛。
+  · 自动补充: 椋鸟存活率 < 35% / 雁 < 50% 时从离猛禽最远的一侧补一波,
+    让学习过程可以长时间观察(可在面板关掉)。
+  · 时间倍速 / 拓扑 K / N 三个滑杆, 鹰脑 Q 表热力图, 小地图。
+
+ 扩展指南:
+  · 加第三只隼: falcons.push(makeFalcon(...)), threats 会自动包含它
+    (threats 在 falcons 之后定义, 引用同一批对象)。
+  · 调鹰的学习: Q_ALPHA/Q_GAMMA/EPS0 在参数区; 想加状态维度就扩 N_STATES,
+    STATE_NONE 必须留在最后一行(它是"视野全空"态)。
+  · 换鸟数: N(椋鸟, ≤MAXN) M(雁, 保持偶数)。复杂度 O(N), 拓扑扫描下
+    N=2000 普通办公机 60 FPS; 想再快就调小 PERCEPTION 或 topoK。
+  · 改软边界宽度: PAD_OPEN。想彻底去掉屏幕外区域就打开「环面」开关。
+ 已知取舍:
+  · 椋鸟的质心引力/迁徙力用了全局质心(鸟群的"集体属性"), 只有猛禽被限为
+    局部视野 —— 这是刻意的: 鸟群靠局部规则涌现, 但"群体整体在哪"这种
+    粗信息保留, 否则开阔世界里鸟群会永久飘散到视口外。
+  · 冲刺 60° 约束会让隼偶尔"追着目标转圈对不齐", 这是特性不是 bug。
+  · Q 学习的奖励直接用得分(椋鸟 1 / 雁 100), 所以雁是"稀疏大奖": 鹰通常先
+    靠椋鸟吃饱(实测 18000 帧 ≈ 239 只椋鸟), 偶尔抓到雁(约 4 只)之后,
+    "雁近"状态的追雁动作会明显抬头 —— 这正是值得盯着 Q 表看的现象。
+  · "全空"那一行的 Q 恒为 0: 视野里没猎物时动作被强制为游荡伏击, 不需要学。
+  · 远距离(>500px)两行也接近 0: 鹰几乎不会从那么远的地方得手, 拿不到信用。
+
+ ============ 第 6 轮 第1步: WebGPU 计算后端(6.1+6.2 上 GPU, 原型) ============
+ 依据与顺序: 迁移方案要求"先证明物理是瓶颈再动渲染"。渲染早已 GPU 化(N=20000 仅 3.7ms),
+ 所以这一刀只切 6.1+6.2。分段实测(清空某段循环做 A/B, N=20000):
+     6.2 邻居扫描+选择+求力 ≈ 90%   6.4 积分+事件 ≈ 15%   6.1 网格重建 ≤2%(与 6.2 耦合, 测不准)
+     其余 CPU 系统(60 只雁 / 鹰 Q / 隼 ES / 互攻 / 补充) = **0.5ms 常数**, 与 N 无关
+   → 只搬 6.1+6.2; 6.4 与全部"智能"留 CPU(搬它们零收益, 还引入同步灾难)。
+
+ 代码结构(第三段 <script>: window.ComputeBackend, 与文件末尾的 GLBackend 同风格):
+   WGSL 三趟 pass, 均 one-thread-per-bird(求力/插鸟 workgroup 256, 清桶 64):
+     clearGrid      : 每线程一个桶, atomicStore(head[c], -1)
+     insertBirds    : 桶号(clamp 到边界) -> atomicExchange 头插, next[i] = 旧头
+                      (方案 2B"原子桶": 省两个 pass, 但桶内顺序不确定 -> 验收只能统计等价)
+     neighborForces : 扫 3x3 桶的链, 距离过滤 -> 16 槽寄存器数组做升序冒泡插入取最近 topoK,
+                      再按与 CPU 逐项同构的公式(凝聚 2.0 / 对齐 1.2 / 距离加权分离 /
+                      双层限幅 ±MAX_FORCE 与 ±2·MAX_FORCE)写出 ACC。环面与开阔双模式都在
+                      shader 里(round(d/w) 最小像 / 边界裁剪), 与 JS 版 minImageX/Y 一致。
+   buffer(SoA, 复用现有定型数组语义): P(160KB)/V(160KB)/ALIVE(u32 80KB)/ACC(160KB) 交错 f32;
+     HEAD(桶数×4B, atomic<i32>)/NXT(N×4B) 链表; Params(uniform 64B = 16×4B: n/gw/gh/topoK
+     + cell/pad/W/H/perceptionR2/sepR2/sepGain/maxSpeed/maxForce/cohesionW/alignmentW + torus);
+     staging(160KB, MAP_READ|COPY_DST)。
+   绑定用**显式 GPUBindGroupLayout(7 项)+ 共用 pipelineLayout**, 不能用 layout:"auto"
+     —— 三趟 pass 静态用到的 binding 不同, 自动布局不一致, 同一个 bind group 会在别的
+     pass 上校验失败(写原型时最容易踩的坑)。
+   每帧: 上行 P/V/ALIVE(320KB@N=20000) -> 三 pass -> copyBufferToBuffer(ACC) -> mapAsync 回读
+     (第 1 步为量上限用同步等待; 异步双缓冲是下一步) -> CPU 跑 cpuCentroidOnly()(只算质心,
+     与 CPU 版同序、逐位一致)+ stepRest()(6.3~6.10)。
+
+ 自检(关键安全网): 初始化时用同一份状态分别跑 CPU 版与 GPU 版的 6.1+6.2, **逐只活鸟**比较 ACC
+   (死鸟两边都不写, 槽位可能残留 NaN, 不参与比较 —— 这是写的时候踩到的坑)。最大绝对差
+   < 1e-4 且无超差项才通过; 不通过就 dispose 并退回 CPU —— 即便 WGSL 有语义错误, 页面只会
+   变慢, 不会给出错误的物理。另外:
+   · getCompilationInfo() 显式捞 WGSL 编译错误(createShaderModule 不抛异常, 否则只会黑屏);
+   · device.addEventListener("uncapturederror") 打到控制台; device.lost 置位让 ready() 变 false;
+   · 运行中任一帧抛错 -> 当场退回 CPU 并 console.warn。
+
+ 开关与浏览器侧验收(本机跑不了 WGSL):
+   ?compute=cpu   强制 CPU(永久保底, 与旧版逐行同构, 且 step() 的 CPU 语义一行未改)
+   ?compute=gpu   强制尝试 GPU, 失败 warn 后回退
+   ?compute=auto  默认: 探测 -> 自检 -> 通过才启用
+   控制台: SIM.compute(状态/自检/设备信息) · await SIM.selfCheckNow() ·
+           await SIM.benchGPU(120) -> {stepMs, uploadMs, gpuMs, readbackMs, cpuRestMs} ·
+           await SIM.setCompute("gpu"|"cpu") · SIM.perf.uploadMs/gpuMs/readbackMs
+   面板 FPS 行已同步显示"计算 WebGPU(上行 x + GPU y + 回读 z ms)"。
+
+ 本机已验证(_checks/headless.mjs 的 [16] 段, 用假 navigator.gpu 跑通整条编码/回读/自检):
+   设备初始化 · 8 个 buffer 的尺寸与 usage · 三趟管线 + 显式布局 7 项与访问类型 · 每帧 4 次
+   上行 · uniform 16 字段与 CPU 常量逐项一致 · 3 次 dispatch 工作量 = ceil(桶数/64) +
+   2×ceil(n/256) · 回读拷贝 8N 字节 · 自检通过路径 · **GPU 结果坏掉 -> 自检失败 -> 退回 CPU** ·
+   WGSL 编译错误检测 -> 退回 · 恢复正常后可再切回 · CPU 路径物理哈希位级不变(e3c17c85)。
+ 未能验证(诚实声明): WGSL 能否真编译、GPU pass 真实耗时 —— 本机 navigator.gpu 不存在, 也起不了
+   浏览器。请在浏览器跑 ?compute=gpu, 把控制台输出与 SIM.benchGPU(120) 的结果贴回来。
+
+ ============ 第 7 轮: 个体再收小 + 间距再收紧 + "加入鹰/隼"按钮 ============
+ ① 体积收小(2D 与 WebGL 共用同一组常量, 不会再走偏):
+      BODY_S 椋鸟 2.2/1.4/1.4 -> [1.6, 1.0, 1.0]
+      BODY_G 雁   3.2/1.8/2.0 -> [2.1, 1.2, 1.3]
+      BODY_F 隼   6.5/5.5/3.6 -> [4.8, 4.0, 2.6]
+      BODY_E 鹰   7.5/6.0/4.2 -> [5.5, 4.4, 3.0]
+    描边也细了(椋鸟 1.0->0.8, 雁 1.3->1.0, 猛禽 3/2->2.2/1.5), 辉光半径同步收(26/18->20/14 等)。
+    glScene.shapes 直接引用 BODY_S/BODY_G, 所以 WebGL 实例化与 2D 描边永远同尺寸。
+ ② 间距收紧(受控扫描, 同一测法, N=2000 无猛禽 1500 帧):
+      配置                        最近邻   第7近邻   群体展布
+      第6轮 SEP=20 PERCEPTION=50    11.5px   21.5px    218px
+      第7轮 SEP=11 PERCEPTION=36     7.1px   13.3px    135px   <- 各约 -38%
+      (还能更紧: SEP=9/PERC=32 -> 5.6px/109px; SEP=7/PERC=28 -> 4.3px/85px, 见 _checks/spacing_sweep.mjs)
+    雁的同类分离半径 GSEP 12->10 同步收紧。副作用: 感知半径变小 -> 候选邻居更少 -> **更快**
+    (N=2000 单步 8.2 -> 7.5ms), 但群体更密 -> 猛禽更容易撞上判定圈, 击杀率会略升。
+ ③ "加入鹰/隼"按钮(快捷键 F / E):
+    · 鹰从单例改成 makeEagle() 工厂 + eagles 数组, 每只鹰**有自己独立的 Q 表**(独立学习),
+      6.6 的 Q-learning 块改为遍历所有鹰; 隼本来就是数组, 能量交棒从 "1-fi" 改成
+      "(fi+1) % falcons.length", 任意只数都成立。
+    · spawnRaptor(kind): 在鸟群质心外 260~420px 随机方位入场, 颜色/编号自动接续,
+      同时推进 raptors(=threats) 数组, 所以逃逸/被捕食/互攻/围攻立即对它生效。
+    · 面板新增"加入隼(F)/加入鹰(E)"两个按钮 + 一行编制显示
+      ("猛禽编制: 隼 ×3 · 鹰 ×2（增援 2 只: 捕获 0 · 得分 0）")。
+    · "重置猛禽"= 解散增援, 回到默认编制(2 隼 + 1 鹰), 所以按钮可逆。
+    · SIM.kills/scores/diet/Q/eps **仍只暴露前三只**(隼①/隼②/鹰), 老验收脚本不受影响;
+      新增 SIM.raptorCount / SIM.raidKills / SIM.addFalcon() / SIM.addEagle() / SIM.raidLine /
+      SIM.bodySizes / SIM.spacing。
+ ④ 本轮物理基准已重设: PHYSICS_HASH 由 e3c17c85 -> 9ae66dff(间距是物理量, 改了必然变; 这是
+    **有意的**基准重设, 之后仍按"哈希是否变化"判断有没有意外动到轨迹)。
+    验证: headless 147 项断言全过; 真机 Edge(headless) CPU/WebGPU 两条路径 0 报错、60 FPS。
+ ⑤ 顺带修掉一个测试设计问题: 雁群"斩首后收拢"原来是混沌单样本, 且 120 帧里 90 帧是混乱期、
+    只剩 30 帧收拢(约 130px 行程), 判定阈值 400px 本来就在刀刃上(实测 153/338/446px 都出现过)。
+    改成 **3 次独立试验**(每次 resetFlocks 从整齐 V 重开, 避免上一次的残破队形污染), 给足
+    90 帧混乱 + 150 帧收拢 = 240 帧, 取中位数判定 -> 实测 159/171/238px, 稳定通过。
+ ============ 第 6 轮 第1步: 真机浏览器验证(Edge 155 headless, 已完成) ============
+ 用的命令(注意: URL 里带查询串时 PowerShell 必须写 "${url}?query", 否则 $url? 会被当变量名):
+   msedge --headless=new --no-sandbox --disable-breakpad --user-data-dir=<ASCII 临时目录> \
+          --window-size=1280,760 --enable-logging=stderr "<file:///.../t.html>?compute=gpu&diag=1"
+   (headless 里 WebGPU 需要 --enable-unsafe-webgpu --use-webgpu-adapter=swiftshader, 否则
+    requestAdapter() 不返回; 中文路径的 file:// URL 会让 Edge 走进 ProtocolLaunch 而不导航,
+    所以要把文件复制到全 ASCII 路径再测。)
+ 结果(实测, 每行都是页面自己 console.info 出来的):
+   CPU 模式  ?compute=cpu&diag=1, 758 帧:
+     "WebGL 实例化渲染已启用: WebGL2 · WebKit WebGL · 最多 20000 只实例"
+     DIAG {"backend":"cpu","n":2000,"fps":60,"stepMs":5.66,"renderMs":0.58, alive:1995, kills:10}
+   WebGPU 模式  ?compute=gpu&diag=1&initTimeout=20000, 1120 帧:
+     "WebGPU 计算启用: 6.1+6.2 上 GPU, 自检通过(maxAbs=3.87e-7)"
+     DIAG {"backend":"webgpu","n":2000,"fps":60,"stepMs":10.9,"gpuMs":10.39,"uploadMs":0.05,
+           "readbackMs":0.01,"renderMs":0.35, alive:1993, kills:12}
+   ?render=2d&compute=cpu: "render=2d: 走 Canvas2D 全路径" + 14 行 DIAG, 全程 0 个
+     Uncaught/TypeError/SyntaxError —— 三种模式都是零报错。
+ 结论: **WGSL 在真实 WebGPU 实现上编译通过、跑 1120 帧稳定、且与 CPU 参考实现逐只对拍一致
+   (maxAbs=3.87e-7, 门限 1e-4)**; WebGL2 实例化渲染也确认在真机可用。注意这里的 adapter 是
+   SwiftShader(软件模拟, 无头环境没给真 GPU), 所以 gpuMs=10.4ms **不代表真机性能** —— 真机
+   数字请用 ?compute=gpu&diag=1 或 SIM.benchGPU(120) 自己跑一遍。
+ 真机跑出来的两个 bug(无头 mock 测不出, 值得记住):
+   ① boot() 原本在主区块求值时**同步**读 window.ComputeBackend, 而 WebGPU 后端在第三个
+      <script> 里、那时还没解析 -> auto 永远退回 CPU。改成 requestAnimationFrame(async boot)。
+   ② headless 里 requestAdapter() 可能长时间不返回 -> 加了 ?initTimeout=ms(默认 3000)超时保护,
+      超时就先按 CPU 起步, 不让画面卡死。
+ 新增开关: ?initTimeout=ms(WebGPU 初始化超时)与 ?diag=1(每秒往控制台打一行 DIAG, 便于真机取证)。
+==================================================================== -->
+
+ ============ 第 8 轮: 三维化 + 重力 + 一键增减鹰隼 ============
+ ① 架构(关键取舍): xy 保持现有交错数组(P/V/ACC/PV 每只 2 float)一行不动 —— 网格哈希、
+   perceive 捞勺、WebGPU 计算后端(6.1+6.2)、2D 俯视渲染、golden 物理哈希全部原样保留;
+   z 轴走独立数组(Z/VZ, 雁 Z2/VZ2)。重力/定高弹簧只作用于 z, 与 xy 完全解耦:
+   **重力勾选关掉时, 本版与第 7 轮逐位一致**(2D 行为的 A/B 开关就是 cbGravity)。
+ ② 3D 视角: 轨道相机(yaw/pitch/dist, 目标平滑跟随群体质心+均高), 左键拖拽旋转、
+   滚轮缩放、无输入时缓慢公转(cbAuto); T 键或按钮切换俯视(投影层退化为恒等映射,
+   旧渲染路径原样工作); ?view=top 可从俯视启动。GL3D 后端(WebGL2): 实例属性 =
+   (x,y,z,vx,vy,vz), 顶点着色器用速度建正交基定向, 透视 + 深度缓冲 + 距离雾;
+   无 ping-pong 残影(相机转动会让屏幕空间拖尾糊片, 3D 靠猛禽拖尾与尸体表达动势)。
+   GL3D 不可用时回退 CPU 软投影(慢但正确)。矩阵: 自实现 column-major persp/lookAt/mul,
+   JS 投影与 GL 共用同一 vpM。
+ ③ 重力(G_GRAV=0.045 px/帧², 可调):
+   · 椋鸟: 重力 - 朝群体均高的定高弹簧(ALT_SPRING=0.008)平衡 -> 悬浮云团;
+     近地推升(FLOOR_PUSH), 不落地; 逃逸升维: 高于猛禽往上飞、低于往下钻(az 分量)。
+   · 雁: 重力×0.8 + 朝领队层(Z2[leaderIdx]+6)的弱弹簧 -> 稳定分层, 不散乱;
+     混乱/让位逃逸同样带垂直分量。
+   · 猛禽(红利所在): 非冲刺朝目标高度爬升(CLIMB_RATE 慢)/俯冲(DIVE_RATE 快);
+     **冲刺中受重力** -> 俯冲加速 stoop(速度 += max(0,-vz)·DIVE_BOOST), 近地拉起
+     (GROUND_MARGIN, 不许撞地); 目标高度来自 perceive 视野均高 pc.z / 锁定的鸟 /
+     对手的高度。爬升掉速、俯冲赚速, 拦截几何从平面圆环变圆柱螺旋。
+   · 尸体: 被吃的鸟带初速做抛体(CORPSE_CAP=384 环形池), 落地停 60 帧消散;
+     叠加层画 3D 点(带雾)。
+   · EAT/FLEE 判定升 3D 球(GRAV_ON 时; 关掉 dz=0 退化为圆); 威慑锥升 3D
+     (轴随领队垂直速度倾角, inCone3 管失血/能耗, perceive 打分仍用 2D 近似 —— 已知取舍)。
+ ④ 一键增减鹰隼: 面板 隼±/鹰± 四键(⇧F/⇧E 快捷键), removeRaptor 从 raptors 摘除并
+   修正 activeId; 隼至少留 1(轮换制度), 鹰可减到 0 —— 面板得分/捕获/食谱/Q 表全部
+   留空显示(renderQ 守卫, SIM 契约不变, 返回 0/空表)。spawnRaptor 增援带随机高度。
+ ⑤ 验收路径: ?view=top + 关重力 == 第 7 轮行为(物理哈希不变的前提: GRAV_ON 关闭);
+   SIM.setGravity/setView3D/removeFalcon/removeEagle/cam/corpses 供脚本化验收;
+   WebGPU 计算路径与 3D 视角无冲突(xy 力在 GPU, z 在 CPU, O(N) 常数级)。
+ 已知取舍: 3D 无群体残影拖尾; 威慑锥打分 2D 近似; 环面模式仍是 2D 语义(z 不穿屏);
+   软渲染兜底在 N=20000 时仅 ~10-15 FPS(兜底而已, 正常走 GL3D)。
+====================================================================

@@ -1,0 +1,12 @@
+﻿import fs from "node:fs"; import vm from "node:vm";
+const t = fs.readFileSync("掠食竞赛-webgpu.html","utf8");
+const blocks=[...t.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
+const noop=()=>{};
+const g=new Proxy({},{get:(x,p)=>(p in x?x[p]:(p==="createRadialGradient"||p==="createLinearGradient")?()=>({addColorStop:noop}):noop),set:(x,p,v)=>(x[p]=v,true)});
+const d={getElementById:()=>({textContent:"",innerHTML:"",value:"2000",checked:false,style:{},classList:{toggle:noop},getContext:()=>g,width:1280,height:720,addEventListener:noop,getBoundingClientRect:()=>({width:1280,height:720,left:0,top:0})}),addEventListener:noop,createElement:()=>({width:0,height:0,getContext:()=>g,style:{}})};
+const sb={document:d,performance:{now:()=>Number(process.hrtime.bigint()/1000n)/1000},requestAnimationFrame:()=>0,console,navigator:{}};
+sb.window=sb; vm.createContext(sb);
+vm.runInContext(blocks.join("\n;\n"),sb,{filename:"sim.js"});
+const SIM=sb.window.SIM; SIM.setGeometry(false); SIM.setN(2000);
+for(let i=0;i<200;i++) SIM.step();
+console.log("  块数="+blocks.length+"  200 步 OK  aliveCount="+SIM.aliveCount+"  backend="+SIM.computeBackend);
