@@ -108,4 +108,4 @@ dev/w6w9/                  ← W6–W9 的验收/诊断脚本（jsdom）
 
 ## 许可
 
-未指定许可证；如需开源授权请告知（默认保留所有权利）。
+MIT License © 2026 xiaoshanqingpro（见 [LICENSE](LICENSE)）。
