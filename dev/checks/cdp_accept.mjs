@@ -8,8 +8,9 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { findEdge } from "../_edge.mjs";
 
-const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+const EDGE = findEdge();
 const src = process.argv[2] || "掠食竞赛.html";
 const work = path.join(os.tmpdir(), "boids_cdp");
 fs.mkdirSync(work, { recursive: true });

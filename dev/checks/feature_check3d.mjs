@@ -1,6 +1,12 @@
-﻿import fs from "node:fs";
-const SRC = "C:/Users/LIHAOYANG/Documents/xwechat_files/wxid_augoprt6793822_89f3/msg/file/2026-10/掠食竞赛-3d.html";
-const MINE = "掠食竞赛.html";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+// 脚本在 dev/checks/ 下，上溯两级即仓库根。
+// 原来的 SRC 指向本机微信接收目录；该文件与会话归档 project/_archive/掠食竞赛-3d-原始交付.html
+// 字节相同（sha256 已核对），故改用仓库内副本；仍可用 argv[2] 覆盖。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const SRC = process.argv[2] || path.join(ROOT, "project", "_archive", "掠食竞赛-3d-原始交付.html");
+const MINE = path.join(ROOT, "掠食竞赛.html");
 const rd = f => fs.readFileSync(f,"utf8");
 const T = rd(SRC), M = rd(MINE);
 // 历轮功能清单: 每一项都要在 3D 版里找到

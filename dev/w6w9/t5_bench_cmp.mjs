@@ -1,7 +1,11 @@
 /* T5 bench 对照: 同一进程内交替跑 基线 / 最终 2D, 各 3 轮, 取"每档中位数"的中位数(降低墙钟漂移) */
 import { loadSim, setRandomSeedOverride, median } from "./jsdom_drive.mjs";
-const BASE = process.argv[2] || "C:\\Users\\LIHAOYANG\\Desktop\\资料库\\涌现HTML汇总\\05_早期二维版本\\掠食竞赛-round7-2d.html";
-const NEW = process.argv[3] || "掠食竞赛_2D.html";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+// 脚本在 dev/w6w9/ 下，上溯两级即仓库根；基线用仓库内的第 7 轮 2D 归档（原来指向本机 涌现HTML汇总 目录）。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const BASE = process.argv[2] || path.join(ROOT, "project", "_archive", "掠食竞赛-round7-2d.html");
+const NEW = process.argv[3] || path.join(ROOT, "掠食竞赛_2D.html");
 const Ns = [2000, 20000], ROUNDS = 3, STEPS = 100;
 
 async function one(path, n) {

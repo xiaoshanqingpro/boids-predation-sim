@@ -1,5 +1,6 @@
-﻿import { spawn } from "node:child_process";
-const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+import { spawn } from "node:child_process";
+import { findEdge } from "../_edge.mjs";
+const EDGE = findEdge();
 const work = process.env.TEMP + "\\boids_browser_test";
 const url = "file:///" + work.replace(/\\/g,"/") + "/t.html?compute=cpu";
 const ud = work + "\\ud_cdp";

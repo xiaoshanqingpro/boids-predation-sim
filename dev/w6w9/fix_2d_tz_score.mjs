@@ -1,8 +1,11 @@
 /* 修正: ① `_2D` 雁隼路径的 tz 残留(加雁隼即崩) ② 计分板长小数(显示取整, 不动物理) */
 import fs from "node:fs";
-const ROOT = "C:/Users/LIHAOYANG/Desktop/资料库/鸟群掠食模拟/";
-const F2D = ROOT + "掠食竞赛_2D.html";
-const F4 = ROOT + "掠食竞赛(4).html";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+// 脚本在 dev/w6w9/ 下，上溯两级即仓库根（原来写死本机桌面副本目录）。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const F2D = path.join(ROOT, "掠食竞赛_2D.html");
+const F4 = path.join(ROOT, "掠食竞赛(4).html");
 const NL = "\n";
 
 function apply(file, reps, label) {

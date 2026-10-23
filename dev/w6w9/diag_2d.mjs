@@ -1,9 +1,11 @@
-﻿/* 诊断 2D 变体: 雁隼能否加入 / 驱逐鸟控件 / 边界机制与效果 */
+/* 诊断 2D 变体: 雁隼能否加入 / 驱逐鸟控件 / 边界机制与效果 */
 import { loadSim, physicsHash } from "./jsdom_drive.mjs";
 
 import path from "node:path";
-const ROOT = "C:/Users/LIHAOYANG/Desktop/资料库/鸟群掠食模拟/";
-for (const name of ["掠食竞赛(4).html", "掠食竞赛_2D.html"]) { const file = ROOT + name;
+import { fileURLToPath } from "node:url";
+// 脚本在 dev/w6w9/ 下，上溯两级即仓库根（原来写死本机桌面副本目录）。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+for (const name of ["掠食竞赛(4).html", "掠食竞赛_2D.html"]) { const file = path.join(ROOT, name);
   console.log("=".repeat(74));
   console.log("=== " + file + " ===");
   const { SIM, win, sha256 } = await loadSim(file, "", { fresh: true });

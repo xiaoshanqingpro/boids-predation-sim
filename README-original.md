@@ -14,7 +14,7 @@
 
 ## 1. 你给我的那份文件是什么（A 版）
 
-`C:\Users\LIHAOYANG\Documents\kimi\tasks\2026-10-14\17-54-52-c2fb5b9d\boids.html`
+`%USERPROFILE%\Documents\kimi\tasks\2026-10-14\17-54-52-c2fb5b9d\boids.html`
 （466 行，标题 *Starlings + Falcons*）——**拓扑椋鸟群 + 双隼捕猎**的实时仿真：
 
 | 组成部分 | 做法 |
@@ -105,7 +105,7 @@
 node _checks\headless.mjs              # 82 项断言(见下, 覆盖四轮全部改动)
 
 # 单步耗时基准(A 版 vs 整合版, 可换 N)
-node _checks\cmp_ab.mjs "C:\Users\LIHAOYANG\Documents\kimi\tasks\2026-10-14\17-54-52-c2fb5b9d\boids.html" "掠食竞赛.html" 2000 1200
+node _checks\cmp_ab.mjs "%USERPROFILE%\Documents\kimi\tasks\2026-10-14\17-54-52-c2fb5b9d\boids.html" "掠食竞赛.html" 2000 1200
 
 # 长程观察鹰的食谱与 Q 表演化(会打印"雁近行是否偏向追雁"的验收判据)
 node _checks\diagnose_eagle.mjs 24000
@@ -236,7 +236,7 @@ Q(追雁) 与 Q(追椋) 的差距都普遍落在 ±0.5% 以内，贪心标记自
   状态与按钮文字同步/`localStorage` 降级，全部通过。
 - 程序化控制：`SIM.setPanelHidden(true|false)`、`SIM.panelHidden`。
 
-原文件未改动，仍在 `C:\Users\LIHAOYANG\Documents\kimi\tasks\2026-10-14\17-54-52-c2fb5b9d\boids.html`。
+原文件未改动，仍在 `%USERPROFILE%\Documents\kimi\tasks\2026-10-14\17-54-52-c2fb5b9d\boids.html`。
 
 ---
 

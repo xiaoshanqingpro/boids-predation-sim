@@ -1,12 +1,15 @@
 /* 诊断②: 2D 加雁隼后 render 是否崩 + 计分板分数为何是长小数 */
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadSim } from "./jsdom_drive.mjs";
-const ROOT = "C:/Users/LIHAOYANG/Desktop/资料库/鸟群掠食模拟/";
+// 脚本在 dev/w6w9/ 下，上溯两级即仓库根（原来写死本机桌面副本目录）。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 for (const name of ["掠食竞赛(4).html", "掠食竞赛_2D.html"]) {
   console.log("=".repeat(72));
   console.log("=== " + name + " ===");
-  const { SIM, win } = await loadSim(ROOT + name, "", { fresh: true });
+  const { SIM, win } = await loadSim(path.join(ROOT, name), "", { fresh: true });
   // 计数用的假 ctx, 让 render 真正走完(jsdom 默认 getContext 返回 null)
   const calls = { n: 0 };
   const ctx = new Proxy({}, { get: (t, p) => (p in t ? t[p] : (p === "canvas" ? { width: 1280, height: 720 } : () => { calls.n++; })), set: (t, p, v) => (t[p] = v, true) });

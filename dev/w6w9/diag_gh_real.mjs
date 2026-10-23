@@ -1,9 +1,13 @@
 /* 真机复现: 2D 版点"雁隼 ＋"是否崩 + 崩溃后渲染是否停 + 计分板小数实况 */
 import { spawn } from "node:child_process";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
-const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+import { fileURLToPath } from "node:url";
+import { findEdge } from "../_edge.mjs";
+// 脚本在 dev/w6w9/ 下，上溯两级即仓库根；原来写死的是本机桌面副本目录。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const EDGE = findEdge();
 const work = path.join(os.tmpdir(), "boids_gh2"); fs.mkdirSync(work, { recursive: true });
-const page = path.join(work, "g.html"); fs.copyFileSync("C:/Users/LIHAOYANG/Desktop/资料库/鸟群掠食模拟/掠食竞赛_2D.html", page);
+const page = path.join(work, "g.html"); fs.copyFileSync(path.join(ROOT, "掠食竞赛_2D.html"), page);
 const url = "file:///" + page.replace(/\\/g, "/") + (process.argv[2] || "");
 const PORT = 9531;
 const child = spawn(EDGE, ["--headless=new", "--no-sandbox", "--disable-breakpad", "--user-data-dir=" + path.join(work, "ud"),
@@ -37,6 +41,6 @@ try {
   await ev(`(() => { for (let i=0;i<1500;i++) SIM.step(); return 1; })()`);
   console.log("1500 帧后计分板:", await ev(`(() => { const rows=[...document.querySelectorAll("#scoreBody tr")].map(tr=>[...tr.querySelectorAll("td")].map(td=>td.textContent).join("|")); return JSON.stringify({rows, total: document.getElementById("scoreTotal")?.textContent, scores: Array.from(SIM.scores)}); })()`));
   const shot = await call("Page.captureScreenshot", { format: "png" });
-  fs.writeFileSync("C:/Users/LIHAOYANG/Desktop/资料库/鸟群掠食模拟/_browser_tmp/w9_gh2.png", Buffer.from(shot.data, "base64"));
+  fs.writeFileSync(path.join(ROOT, "project", "_browser_tmp", "w9_gh2.png"), Buffer.from(shot.data, "base64"));
   ws.close();
 } catch (e) { console.error("诊断出错:", e.message); } finally { child.kill(); }

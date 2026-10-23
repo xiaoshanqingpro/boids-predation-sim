@@ -1,10 +1,14 @@
-﻿/* 2D 版: 抓"鹰 + 隼同时冲刺"那一帧(带加强拖尾)
+/* 2D 版: 抓"鹰 + 隼同时冲刺"那一帧(带加强拖尾)
  * 手法: 高频轮询 SIM.hunterDetail(k).dashT; 命中 -> 冻结 SIM.step(渲染循环继续、画面定格) -> 截图 */
 import { spawn } from "node:child_process";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
-const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-const SRC = "C:/Users/LIHAOYANG/Desktop/资料库/鸟群掠食模拟/掠食竞赛_2D.html";
-const OUT = "C:/Users/LIHAOYANG/Desktop/资料库/鸟群掠食模拟/_browser_tmp/";
+import { fileURLToPath } from "node:url";
+import { findEdge } from "../_edge.mjs";
+// 脚本在 dev/w6w9/ 下，上溯两级即仓库根；原来写死的是本机桌面副本目录。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const EDGE = findEdge();
+const SRC = path.join(ROOT, "掠食竞赛_2D.html");
+const OUT = path.join(ROOT, "project", "_browser_tmp") + path.sep;
 const work = path.join(os.tmpdir(), "boids_shot"); fs.mkdirSync(work, { recursive: true });
 const page = path.join(work, "s.html"); fs.copyFileSync(SRC, page);
 const PORT = 9541;

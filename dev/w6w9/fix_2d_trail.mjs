@@ -1,6 +1,10 @@
 /* 用户要求: 加强所有猛禽冲刺时的拖尾(2D 版) —— 速度 streak, 按行插入(自动沿用缩进) */
 import fs from "node:fs";
-const P = "C:/Users/LIHAOYANG/Desktop/资料库/鸟群掠食模拟/掠食竞赛_2D.html";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+// 脚本在 dev/w6w9/ 下，上溯两级即仓库根（原来写死本机桌面副本目录）。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const P = path.join(ROOT, "掠食竞赛_2D.html");
 const lines = fs.readFileSync(P, "utf8").split("\n");
 
 // ① 找 drawHunter 里那行"三维拖尾折线已删除"注释

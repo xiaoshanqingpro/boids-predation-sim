@@ -1,18 +1,28 @@
-﻿/* 汇总所有"涌现"（掠食竞赛 / 椋鸟群）HTML: 扫描 → 内容分类 → 去重 → 收进一个文件夹 → 生成清单
- * 用法: node _w6w9/collect_html.mjs [--dry]
+/* 汇总所有"涌现"（掠食竞赛 / 椋鸟群）HTML: 扫描 → 内容分类 → 去重 → 收进一个文件夹 → 生成清单
+ * 用法: node dev/w6w9/collect_html.mjs [--dry] [--out=<目录>] [--scan=<目录1;目录2;...>]
+ * 说明: 默认只扫仓库自身（含 project/_archive、_wip、_patches）；
+ *       要额外扫本机桌面/下载/微信目录，用 --scan 或环境变量 COLLECT_SCAN_DIRS 显式给出，
+ *       不再把本机绝对路径写死在脚本里。默认输出到系统临时目录下的 涌现HTML汇总/。
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 const DRY = process.argv.includes("--dry");
-const ROOT = "C:/Users/LIHAOYANG/Desktop/资料库";
-const OUT = path.join(ROOT, "涌现HTML汇总");
+// 脚本在 dev/w6w9/ 下，上溯两级即仓库根。
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const argOf = (name) => {
+  const hit = process.argv.find(a => a.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : undefined;
+};
+const OUT = argOf("out") || path.join(os.tmpdir(), "涌现HTML汇总");
+const EXTRA_DIRS = (argOf("scan") || process.env.COLLECT_SCAN_DIRS || "")
+  .split(";").map(s => s.trim()).filter(Boolean);
 const SCAN_DIRS = [
-  ROOT,                                                     // 项目树(含 _archive/_wip/_patches)
-  "C:/Users/LIHAOYANG/Desktop",                             // 桌面(用户给的基线)
-  "C:/Users/LIHAOYANG/Downloads",
-  "C:/Users/LIHAOYANG/Documents/xwechat_files/wxid_augoprt6793822_89f3/msg/file/2026-10",
+  ROOT,                                                     // 仓库自身(含 project/_archive/_wip)
+  ...EXTRA_DIRS,                                            // 额外目录：用 --scan/COLLECT_SCAN_DIRS 指定
 ];
 const MARKERS = {
   "W5失速(施工单血统)": t => t.includes("GH_STALL_FRAMES") && t.includes("ghunterStallFrames"),
