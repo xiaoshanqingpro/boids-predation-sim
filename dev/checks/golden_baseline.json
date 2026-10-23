@@ -1,0 +1,17 @@
+{
+  "_readme": "golden.mjs 的物理哈希基线。hash 由 node dev/checks/golden.mjs --update 真跑生成，不要手改；改动物理/帧数/N/query 后必须 --update 并在提交信息里说明为什么。",
+  "2d": {
+    "file": "掠食竞赛_2D.html",
+    "frames": 600,
+    "n": 2000,
+    "query": "",
+    "hash": "2ade7364"
+  },
+  "default": {
+    "file": "掠食竞赛.html",
+    "frames": 600,
+    "n": 2000,
+    "query": "",
+    "hash": "882aaa6c"
+  }
+}

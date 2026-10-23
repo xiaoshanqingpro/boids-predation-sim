@@ -64,6 +64,7 @@ URL 参数：`?compute=cpu|gpu|auto`（计算后端）、`?render=2d`（强制 C
 `dev/` 下保留了完整的验收脚本（Node + jsdom，无需浏览器）：
 
 ```
+node dev/checks/golden.mjs              # 物理金标准：跑固定种子，与 golden_baseline.json 比对（失配 exit 1）
 node dev/checks/headless.mjs            # 主逻辑不变量
 node dev/w6w9/t4_final_suite.mjs "掠食竞赛(4).html"   # W6–W9 全量验收（双臂 + 冻结守卫）
 node dev/w6w9/t5_conserve.mjs 2000 11,22,33           # 守恒线：2D 与 (4)?grav=0 逐位对比
@@ -72,6 +73,14 @@ node dev/w6w9/t5_conserve.mjs 2000 11,22,33           # 守恒线：2D 与 (4)?g
 **守恒线**（2D 变体必须与完整版的 `?grav=0` 物理逐位一致）：固定种子 2000 帧，
 `physicsHash` = `f1939905`(11) / `5d7bc120`(22) / `48af6cbe`(33)。
 删除 z 代码时**必须保留所有 `Math.random()` 调用**（包括已无人读的），否则随机数流改变、守恒立即失败。
+
+`dev/checks/golden.mjs` 现在会**与 `dev/checks/golden_baseline.json` 比对哈希**并打印 `PASS` /
+`FAIL expected=<x> actual=<y>`，失配即 `exit(1)`（基线缺失也会提示）。默认用例 `default`（`掠食竞赛.html`，
+600 帧 / N=2000 / 无 query）与 `2d`（`掠食竞赛_2D.html`，同样 600 帧）都已把真跑出的哈希写进基线。
+**改动物理（或改帧数 / N / query）必须** `node dev/checks/golden.mjs --update` 重设基线，
+并在提交信息里写清为什么这次哈希变化是合法的——否则等于把回归网静默关掉。
+这条线很便宜：本机（2026-10 实测）两个用例全跑 **约 10.5 秒**（单用例约 5.3 秒；
+600 帧 / N=2000），所以改物理前后都值得跑一遍。
 
 验收总表见 [docs/W6-W9_验收总表.md](docs/W6-W9_验收总表.md)（PASS 29 / FAIL 3，3 条 FAIL 均带归因：
 判据天花板/判据口径/设计交互，非实现缺陷）；各任务报告见 `docs/`。
@@ -82,8 +91,9 @@ node dev/w6w9/t5_conserve.mjs 2000 11,22,33           # 守恒线：2D 与 (4)?g
 掠食竞赛.html / (3).html / (4).html / _2D.html / -webgpu.html   ← 五个可独立运行的版本
 README.md                  ← 本文件
 README-original.md         ← 561 行开发记录（第 1–5 轮细节）
+LICENSE                    ← MIT
 docs/                      ← 任务报告、验收总表、截图
-dev/checks/                ← 主逻辑不变量与探针脚本
+dev/checks/                ← 主逻辑不变量与探针脚本（含 golden.mjs + golden_baseline.json）
 dev/patches/               ← 逐处精确锚点的补丁脚本（可幂等重跑）
 dev/w6w9/                  ← W6–W9 的验收/诊断脚本（jsdom）
 ```
