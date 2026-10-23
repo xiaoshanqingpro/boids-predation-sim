@@ -1,0 +1,21 @@
+/* 单纯跑步数, 供 --prof 采样 */
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+import { fileURLToPath } from "node:url";
+const here = path.dirname(fileURLToPath(import.meta.url));
+const code = fs.readFileSync(path.join(here, "..", "掠食竞赛.html"), "utf8").match(/<script>([\s\S]*?)<\/script>/)[1];
+const noop = () => {};
+const ctx = new Proxy({}, { get: (t, p) => (p in t ? t[p] : (p === "createRadialGradient" || p === "createLinearGradient") ? () => ({ addColorStop: noop }) : noop), set: (t, p, v) => (t[p] = v, true) });
+const documentStub = { getElementById: () => ({ textContent: "", value: "0", checked: false, style: {}, classList: { toggle: noop }, getContext: () => ctx, width: 250, height: 100, addEventListener: noop }), addEventListener: noop };
+const sandbox = { document: documentStub, window: {}, performance: { now: () => Date.now() }, requestAnimationFrame: () => 0, console };
+vm.createContext(sandbox);
+vm.runInContext(code, sandbox, { filename: "sim.js" });
+const SIM = sandbox.window.SIM;
+SIM.setGeometry(false);
+const N = Number(process.argv[2] || 2000), STEPS = Number(process.argv[3] || 1200);
+SIM.setN(N);
+for (let i = 0; i < 200; i++) SIM.step();
+const t = performance.now();
+for (let i = 0; i < STEPS; i++) SIM.step();
+console.log(`N=${N} steps=${STEPS} ${((performance.now() - t) / STEPS).toFixed(2)} ms/step`);

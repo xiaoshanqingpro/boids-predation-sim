@@ -1,0 +1,12 @@
+﻿import { loadSim, setRandomSeedOverride } from "./jsdom_drive.mjs";
+const { SIM, win } = await loadSim("掠食竞赛(4).html", "");
+setRandomSeedOverride(win, 101);
+SIM.addGhunter();
+for (let i=0;i<200;i++) SIM.step();
+console.log("ghunterConst=", JSON.stringify(SIM.ghunterConst));
+if (SIM.clearLog) SIM.clearLog();
+for (let i=0;i<2500;i++) SIM.step();
+const L = SIM.logTail(6);
+console.log("logCount=", SIM.logCount, "entries:");
+for (const e of L) console.log("  ", JSON.stringify(e));
+process.exit(0);

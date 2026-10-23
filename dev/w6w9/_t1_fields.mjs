@@ -1,0 +1,15 @@
+﻿import { loadSim, setRandomSeedOverride } from "./jsdom_drive.mjs";
+const { SIM, win } = await loadSim("掠食竞赛(4).html", "?grav=0");
+setRandomSeedOverride(win, 1);
+SIM.resetFlocks(); SIM.resetPredators();
+for (const k in SIM.stats) if (typeof SIM.stats[k] === "number") SIM.stats[k] = 0;
+for (let i=0;i<1500;i++) SIM.step();
+const b = JSON.parse(JSON.stringify(SIM.stats));
+for (let i=0;i<2000;i++) SIM.step();
+const st = SIM.stats;
+console.log("stats dash/chain/miss 字段:");
+for (const k of Object.keys(st)) if (/dash|chain|miss/i.test(k)) console.log(`   ${k} = ${st[k]} (窗口内 Δ=${st[k]-b[k]})`);
+console.log("chainConst=", JSON.stringify(SIM.chainConst));
+console.log("chainInfo=", JSON.stringify(SIM.chainInfo));
+console.log("kills=", JSON.stringify(SIM.kills), "scores=", JSON.stringify(SIM.scores));
+process.exit(0);

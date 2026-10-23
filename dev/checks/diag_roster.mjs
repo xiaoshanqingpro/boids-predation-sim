@@ -1,0 +1,30 @@
+﻿import fs from "node:fs"; import vm from "node:vm";
+const html = fs.readFileSync("掠食竞赛.html","utf8");
+const cut = html.indexOf('<script type="text/plain"');
+const code = [...(cut>0?html.slice(0,cut):html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join("\n;\n");
+const grad={addColorStop(){}};
+const ctx=new Proxy({},{get:(t,p)=>(p in t?t[p]:(p==="createRadialGradient"||p==="createLinearGradient")?()=>grad:(p==="measureText"?()=>({width:10}):()=>{})),set:(t,p,v)=>(t[p]=v,true)});
+const els=new Map();
+const mk=(id)=>({id,textContent:"",innerHTML:"",value:"2000",checked:false,style:{},className:"",children:[],addEventListener(){},classList:{toggle(){},add(){},remove(){}},getContext:()=>ctx,appendChild(c){if(c&&c.id)els.set(c.id,c);return c},removeChild(c){return c},getBoundingClientRect:()=>({width:1280,height:720,left:0,top:0})});
+const d={getElementById:id=>{ if(!els.has(id)) els.set(id,mk(id)); return els.get(id);}, addEventListener(){}, createElement:()=>mk("c"+Math.random())};
+const sb={document:d,window:{addEventListener(){},removeEventListener(){},location:{search:""}},location:{search:""},performance:{now:()=>Date.now()},requestAnimationFrame:()=>0,console};
+vm.createContext(sb); vm.runInContext(code,sb,{filename:"sim.js"});
+const SIM=sb.window.SIM; SIM.setGeometry(false); SIM.setN(2000); SIM.setGravity(true);
+const log=[]; const chk=(name,fn)=>{ try { log.push(`${name}: ${JSON.stringify(fn())}`); } catch(e){ log.push(`${name}: ✗ 抛错 ${e.message}`); } };
+chk("初始", ()=>({count:SIM.raptorCount, scores:SIM.scores.length, kills:SIM.kills.length, Q:SIM.Q.length, eps:SIM.eps}));
+chk("加2隼2鹰", ()=>{ SIM.addFalcon(); SIM.addFalcon(); SIM.addEagle(); SIM.addEagle(); return SIM.raptorCount; });
+chk("旧别名与真鹰是否同一对象", ()=>({ 同: SIM.Q === (SIM.hunter(FALCONS=2)&&null) , 占位:1 }));
+// 关键检查: SIM.Q / eps / diet 是否指向"活着的"第一只鹰
+let liveEagleQ = null;
+try { liveEagleQ = SIM.Q; } catch(e){}
+chk("跑 200 帧", ()=>{ for(let i=0;i<200;i++) SIM.step(); return {alive:SIM.aliveCount, kills:SIM.kills.reduce((a,b)=>a+b,0)}; });
+chk("鹰减到 0", ()=>{ let n=0; while(SIM.raptorCount.eagles>0){ SIM.removeEagle(); n++; } return {次数:n, count:SIM.raptorCount, eps:SIM.eps, diet:SIM.diet}; });
+chk("鹰0时跑100帧", ()=>{ for(let i=0;i<100;i++) SIM.step(); return {ok:1, kills:SIM.kills.reduce((a,b)=>a+b,0)}; });
+chk("再加一只鹰 + 跑200帧", ()=>{ SIM.addEagle(); for(let i=0;i<200;i++) SIM.step(); return {count:SIM.raptorCount, eps:+SIM.eps.toFixed(3), diet:SIM.diet, qLen:SIM.Q.length}; });
+chk("隼减到 1", ()=>{ let n=0; while(SIM.raptorCount.falcons>1){ SIM.removeFalcon(); n++; } return {次数:n, count:SIM.raptorCount, scores:SIM.scores, killsArr:SIM.kills}; });
+chk("隼1时跑300帧", ()=>{ for(let i=0;i<300;i++) SIM.step(); return {count:SIM.raptorCount, killsArr:SIM.kills, alive:SIM.aliveCount}; });
+chk("再加隼", ()=>{ SIM.addFalcon(); for(let i=0;i<100;i++) SIM.step(); return SIM.raptorCount; });
+chk("raptors 是否有重复/幽灵", ()=>{ const r=SIM.raidKills.length; return {raidKillsLen:r, count:SIM.raptorCount, 一致: r===SIM.raptorCount.total}; });
+chk("重置猛禽", ()=>{ SIM.resetPredators(); return SIM.raptorCount; });
+chk("面板刷新", ()=>{ SIM.refreshPanel(); return (els.get("raidLine")||{}).textContent; });
+for(const l of log) console.log("  " + l);

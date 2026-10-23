@@ -1,0 +1,16 @@
+﻿import { loadSim, setRandomSeedOverride } from "./jsdom_drive.mjs";
+const { SIM, win } = await loadSim("掠食竞赛(4).html", "?grav=1");
+setRandomSeedOverride(win, 1);
+SIM.setGeometry(false); SIM.setN(2000); SIM.setRefill(true); SIM.resetPredators(); SIM.addGhunter();
+SIM.setBandit(true); SIM.setBanditTrace(true);
+for (let i=0;i<3200;i++) SIM.step();
+const b = SIM.ghunterBandit;
+console.log("bandit keys:", Object.keys(b));
+console.log("on=", b.on, "ghunters len=", (b.ghunters||[]).length);
+const g = b.ghunters[0];
+console.log("g keys:", g && Object.keys(g));
+console.log("q=", JSON.stringify(g && g.q), "n=", JSON.stringify(g && g.n));
+console.log("choicesAfter80=", JSON.stringify(g && g.choicesAfter80));
+console.log("w=", g && g.w, "episodes=", SIM.stats.ghunterBanditEpisodes);
+console.log("gooseDisarray=", SIM.stats.gooseDisarray, "disarray now=", SIM.geeseInfo.disarray);
+process.exit(0);
